@@ -1,6 +1,7 @@
 artifacts/
 build-x86/
 __pycache__/
+.letta
 
 # Provider audio stays private, including in historical checkouts.
 /assets/audio/*.pcm
