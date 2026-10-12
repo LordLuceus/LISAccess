@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "narration.h"
+#include "engine_abi.h"
 #include <bcrypt.h>
 #include <shlobj.h>
 #include <algorithm>
@@ -114,10 +115,10 @@ void Discover() {
             Read<uintptr_t>(Read<uintptr_t>(obj) + 72 * 4) == base + ProcessEventRva) menu = obj;
     }
 }
-// Confirmed dispatch ABI is this + TWO stack arguments (not stock SDK guesses).
+// Both UObject and AActor dispatchers end in ret 0x0c: THREE stack arguments.
+// The legacy result pointer is unused on this path but must still be supplied.
 void Event(uintptr_t fn, void* args) {
-    using Call = void(__thiscall*)(void*, void*, void*);
-    reinterpret_cast<Call>(base + ProcessEventRva)(reinterpret_cast<void*>(menu), reinterpret_cast<void*>(fn), args);
+    reinterpret_cast<engine::ProcessEvent>(base + ProcessEventRva)(reinterpret_cast<void*>(menu), reinterpret_cast<void*>(fn), args, nullptr);
 }
 std::wstring TakeString(FString& value) {
     std::wstring text;
