@@ -1,0 +1,7 @@
+artifacts/
+build-x86/
+__pycache__/
+
+# Provider audio stays private, including in historical checkouts.
+/assets/audio/*.pcm
+/assets/audio/*.wav
