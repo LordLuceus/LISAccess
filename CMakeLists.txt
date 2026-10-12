@@ -12,6 +12,9 @@ add_library(dinput8 SHARED
     src/proxy.cpp
     src/platform.cpp
     src/runtime.cpp
+    src/audio_cues.cpp
+    src/navigation.cpp
+    src/world_probe.cpp
     src/dinput8.def
 )
 target_compile_features(dinput8 PRIVATE cxx_std_17)
@@ -30,6 +33,12 @@ target_compile_features(narration_test PRIVATE cxx_std_17)
 target_compile_options(narration_test PRIVATE /W4 /utf-8)
 set_property(TARGET narration_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_test(NAME narration COMMAND narration_test)
+add_executable(navigation_test tests/navigation_test.cpp)
+target_include_directories(navigation_test PRIVATE src)
+target_compile_features(navigation_test PRIVATE cxx_std_17)
+target_compile_options(navigation_test PRIVATE /W4 /utf-8)
+set_property(TARGET navigation_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+add_test(NAME navigation_geometry COMMAND navigation_test)
 add_executable(native_abi_test tests/native_abi_test.cpp)
 target_include_directories(native_abi_test PRIVATE src)
 target_compile_features(native_abi_test PRIVATE cxx_std_17)

@@ -1,0 +1,73 @@
+{
+  "provider": "ElevenLabs",
+  "model": "eleven_text_to_sound_v2",
+  "requested_duration_seconds": 0.5,
+  "prompt_influence": 0.7,
+  "output_format": "pcm_24000",
+  "generation_date": "2026-10-12",
+  "synthetic_fallback": false,
+  "personal_data_sent": false,
+  "source_format": "PROVISIONAL PCM16 LE stereo interleaved 24000Hz; channel layout UNCONFIRMED. Signal analysis is not authoritative and could misclassify mono. Original bytes preserved unchanged.",
+  "channel_evidence": {
+    "cli": "elevenlabs text-to-sound-effects convert --schema: output_format describes codec/sample rate/bitrate but no channel count; generation reported audio/pcm without channels",
+    "official_docs_url": "https://elevenlabs.io/docs/api-reference/text-to-sound-effects/convert",
+    "official_docs_result": "HTTP 403 Forbidden on verification attempt; no authoritative channel evidence obtained",
+    "consequence": "If source is mono, provisional pair-averaging interpretation changes timing and pitch. Exact original duration/timbre is not asserted. Replace/reprocess after authoritative confirmation."
+  },
+  "processing": "Provisionally stereo averaged to mono; trim leading/trailing below -45dB relative peak with 2ms preroll/12ms tail; cap obstacle 160ms, object/destination 280ms, person 400ms; 2ms fade in/8ms fade out; peak normalize -12dBFS. Playback gain is set separately by navigation.ini Volume.",
+  "limitations": "Generated placeholders, not perceptually auditioned. Prompt compliance/double-tone distinction requires user listening validation. Stereo pan provides left/right only, not front/back. Source PCM retained for provenance/reprocessing. No synthetic fallback used.",
+  "cues": {
+    "obstacle": {
+      "prompt": "One single soft dry muted click for an obstacle navigation cue. Instant onset, very short decay, silence afterwards. Nonverbal isolated mono user interface sound. No voice, no music, no background, no reverb.",
+      "source_bytes": 46080,
+      "provisional_source_duration_seconds_if_stereo": 0.48,
+      "source_duration_seconds_if_mono": 0.96,
+      "trimmed_start_seconds": 0.0,
+      "duration_seconds": 0.16,
+      "peak_dbfs": -11.999946665424783,
+      "rms_dbfs": -27.94717235250896,
+      "channels": 1,
+      "sample_rate": 24000,
+      "bits": 16
+    },
+    "person": {
+      "prompt": "Exactly two soft dry rounded electronic tones close together, a distinguishable double tone person navigation cue. Instant onset, short decay, silence afterwards. Nonverbal isolated mono user interface sound. No voice, no music, no background, no reverb.",
+      "source_bytes": 46080,
+      "provisional_source_duration_seconds_if_stereo": 0.48,
+      "source_duration_seconds_if_mono": 0.96,
+      "trimmed_start_seconds": 0.0,
+      "duration_seconds": 0.39870833333333333,
+      "peak_dbfs": -11.999946665424783,
+      "rms_dbfs": -23.89706411741823,
+      "channels": 1,
+      "sample_rate": 24000,
+      "bits": 16
+    },
+    "object": {
+      "prompt": "One bright short dry pluck for an object navigation cue. Instant onset, very short decay, silence afterwards. Nonverbal isolated mono user interface sound. No voice, no music, no background, no reverb.",
+      "source_bytes": 46080,
+      "provisional_source_duration_seconds_if_stereo": 0.48,
+      "source_duration_seconds_if_mono": 0.96,
+      "trimmed_start_seconds": 0.0,
+      "duration_seconds": 0.28,
+      "peak_dbfs": -11.999946665424783,
+      "rms_dbfs": -29.313999458468608,
+      "channels": 1,
+      "sample_rate": 24000,
+      "bits": 16
+    },
+    "destination": {
+      "prompt": "One warm soft short dry ping for a destination navigation cue. Instant onset, short decay, silence afterwards. Nonverbal isolated mono user interface sound. No voice, no music, no background, no reverb.",
+      "source_bytes": 46080,
+      "provisional_source_duration_seconds_if_stereo": 0.48,
+      "source_duration_seconds_if_mono": 0.96,
+      "trimmed_start_seconds": 0.0,
+      "duration_seconds": 0.28,
+      "peak_dbfs": -11.999946665424783,
+      "rms_dbfs": -23.5058577306893,
+      "channels": 1,
+      "sample_rate": 24000,
+      "bits": 16
+    }
+  }
+}

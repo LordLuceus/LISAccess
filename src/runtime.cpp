@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "narration.h"
+#include "navigation.h"
 #include "engine_abi.h"
 #include <bcrypt.h>
 #include <shlobj.h>
@@ -216,6 +217,7 @@ bool SafeSnapshot() {
     __except(EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
+    navigation::Tick();
     if (!failed && !SafeSnapshot()) { failed = true; Log("event=bridge_fault status=disabled"); }
 }
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
@@ -278,6 +280,7 @@ void RunRuntime(HMODULE module) {
     SetLastError(0);
     previousProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WindowProc)));
     if (!previousProc) { Log("event=subclass_failed"); Speak(L"Could not attach menu inspection."); return; }
+    navigation::Initialize(module);
     timer = SetTimer(window, 0x4c4953, 200, TimerProc);
     if (!timer) { Log("event=timer_failed"); Speak(L"Could not start menu inspection."); return; }
     Log("event=bridge_ready window_thread=" + std::to_string(GetWindowThreadProcessId(window, nullptr)));
@@ -287,6 +290,7 @@ void RunRuntime(HMODULE module) {
         Files();
         if (failed && !faultSpoken) { Speak(L"Menu inspection failed and has been disabled. See the prototype log."); faultSpoken = true; }
         std::wstring speech;
+        bool readableMenu = false;
         const bool foreground = IsGameForeground();
         {
             std::lock_guard<std::mutex> lock(stateMutex);
@@ -294,13 +298,16 @@ void RunRuntime(HMODULE module) {
             if (!speech.empty()) lastSpeech = speech;
             if (foreground && !wasForeground && speech.empty() && hasMenu) speech = lastSpeech;
             if (repeat.exchange(false)) speech = lastSpeech;
-            if (help.exchange(false)) speech = L"Menu prototype. Use the game's arrow keys, Enter to select and Escape to go back. R repeats. F1 reads this help. Opening navigation is not implemented.";
+            if (help.exchange(false)) speech = L"Menu prototype. Use the game's arrow keys, Enter to select and Escape to go back. R repeats. F1 reads this help. F3 previews navigation sounds. Navigation controls become available during gameplay.";
+            readableMenu = hasMenu;
         }
         if (!speech.empty() && foreground) Speak(speech);
+        navigation::Pump(foreground, readableMenu);
         wasForeground = foreground;
-        Sleep(200);
+        Sleep(25);
     }
     KillTimer(window, timer);
+    navigation::Shutdown();
     ShutdownPlatform();
 }
 }

@@ -24,14 +24,21 @@ try {
     try { & (Join-Path $PSScriptRoot 'remove-prototype.ps1') } catch { $blocked=$_.Exception.Message -match 'File changed' }
     if(-not $blocked){throw 'Changed DLL removal was not rejected'}
     Copy-Item -LiteralPath (Join-Path $root 'build-x86\Release\dinput8.dll') -Destination $dll
+    $config=Join-Path $game 'LISAccess\navigation.ini'
+    [IO.File]::AppendAllText($config,"`r`n; user customization")
+    $customHash=(Get-FileHash -LiteralPath $config).Hash
+    & (Join-Path $PSScriptRoot 'install-prototype.ps1') -GameDirectory $game -NvdaClient $client
+    if((Get-FileHash -LiteralPath $config).Hash -ne $customHash){throw 'Update overwrote customized settings'}
     & (Join-Path $PSScriptRoot 'remove-prototype.ps1')
     if((Test-Path $dll) -or (Test-Path (Join-Path $game 'nvdaControllerClient32.dll'))){throw 'Owned DLL cleanup failed'}
     if(-not(Test-Path (Join-Path $game 'LifeIsStrange.exe'))){throw 'Uninstaller touched the game executable'}
+    if((Get-FileHash -LiteralPath $config).Hash -ne $customHash){throw 'Uninstaller removed customized settings'}
+    if(Test-Path (Join-Path $game 'LISAccess\audio\obstacle.wav')){throw 'Unchanged cue was not removed'}
     [IO.File]::WriteAllText($dll,'unowned-fixture')
     $blocked=$false
     try { & (Join-Path $PSScriptRoot 'install-prototype.ps1') -GameDirectory $game -NvdaClient $client } catch { $blocked=$_.Exception.Message -match 'Refusing to replace' }
     if(-not $blocked -or (Test-Path (Join-Path $game 'nvdaControllerClient32.dll'))){throw 'Unowned-file gate failed'}
-    Write-Output 'PASS: fresh install, owned update, tamper rejection, safe removal and unowned-file refusal.'
+    Write-Output 'PASS: fresh install, owned update, tamper rejection, custom-settings preservation, safe removal and unowned-file refusal.'
 } finally {
     $env:LOCALAPPDATA=$oldLocal
     if(-not ([IO.Path]::GetFullPath($temporary)).StartsWith($workspace,[StringComparison]::OrdinalIgnoreCase)){throw 'Cleanup escaped workspace'}

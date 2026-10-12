@@ -22,6 +22,19 @@ or overwrite an unrelated installed controller.
 
 SAPI fallback uses the Windows-provided speech API; no SAPI runtime is bundled.
 
+## Navigation audio
+
+Playback uses the Windows-provided XAudio2 runtime; no XAudio2 redistributable is
+bundled. The four private placeholder cues were generated using the developer's
+authorized ElevenLabs CLI access. Prompts, processing and original provider bytes
+are recorded in `assets/audio/provenance.json` and beside the processed WAVs.
+
+The raw PCM response did not identify channel count, so the original channel
+interpretation remains provisional; these are processed placeholders, not a claim
+of exact provider-original timing or pitch. Listening feedback will decide whether
+to keep or replace them. Confirm the applicable account's output/distribution terms
+before any public release; these assets are not described as public-domain audio.
+
 ## Research-only software
 
 Dissect's Apache-2.0 LZO decoder and JPEXS FFDec (GPL-3.0-or-later) were used to

@@ -1,11 +1,13 @@
-# LISAccess — experimental menu prototype
+# LISAccess — accessibility prototype
 
 This is a private prototype for **original Life Is Strange on Windows
 (Steam build 2304417)**. It is not for the remaster or Before the Storm.
 
-**Opening navigation and gameplay accessibility are not implemented.** This build
-is intended to test reaching a new game through the title screen, save-slot picker
-and main menu. Do not interpret silence during gameplay as an empty or safe area.
+The title, save-slot picker and main-menu narration are the accepted baseline.
+An **experimental opening-navigation layer** has been used successfully to reach
+the lighthouse and enter the next scene. Cue balance at normal game volume still
+needs listening feedback. This is not complete gameplay accessibility, and silence
+never means that an area is safe.
 
 ## What it does
 
@@ -39,15 +41,83 @@ use; existing saves are not disposable test data.
 | Enter | The game's accept/select action |
 | Escape | The game's back/cancel action |
 | R | Repeat the last current menu readout while the prototype has readable menu focus |
-| F1 | Read prototype help while it has readable menu focus |
+| F1 | Read help for readable menu focus, or navigation help during supported gameplay |
+| F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
 
-There is no navigation assistance after New Game begins. R is not assigned a new
-gameplay action by this mod; outside its menu context it remains the game's key.
+R remains the game's rewind key outside menu narration. Navigation keys are plain
+keys, without Ctrl, Alt or Shift; native movement bindings are not changed.
+
+## Opening navigation (experimental)
+
+> This is a first navigation design to try, not a settled interface. The cues and
+> controls may change or be replaced after listening and walking tests. Feedback
+> on whether they are useful matters as much as whether they fire correctly. The
+> accepted menu narration is separate from this experimental navigation layer.
+
+Use the game's movement controls and mouse to turn the camera. There is no
+auto-walk, automatic turning, route planner or automatic interaction. Audio
+direction is relative to the camera, not Max's body orientation.
+
+| Key | Navigation action (experimental) |
+|---|---|
+| F2 | Toggle obstacle proximity cues; initially off |
+| Page Down / Page Up | Select next / previous supported destination |
+| Home | Describe the selected destination and its current direction |
+| End | Toggle the selected destination's directional beacon |
+| F1 | Read navigation help |
+| F3 | Preview the next sound: obstacle, person, object, destination |
+
+Known input conflict: End is also the game's alternate diary key. The opening
+route was tested successfully, but the beacon binding needs changing before wider
+gameplay use. Controller navigation commands are not implemented yet.
+
+The initial destination is **Lighthouse approach**, attached to an authored
+opening-scene trigger. Its beacon is a bearing to that point, **not a walkable
+route**. Turn and choose your way around obstacles yourself. The beacon pans left
+or right; a lower pitch means the target is behind the camera. Speech gives broad
+distance and elevation descriptions without claiming an unverified metre scale.
+
+Obstacle cues use short, partial-body collision sweeps ahead, ahead-left and
+ahead-right. The nearest detected obstruction determines pan and pulse rate;
+nearer obstacles pulse faster. A lower-pitched obstacle pulse warns of a possible
+drop or missing ground just ahead. These checks cover a small region, not the
+whole character or a planned route. Floor contact can hide geometry beyond it;
+slopes, moving objects and uneven ground still need testing. They neither prevent
+movement nor guarantee that a passage is clear.
+
+Navigation requires a verified controllable player and a positive floor query.
+It stops when the game loses focus, controls are unavailable, a menu is active,
+or the snapshot becomes stale. After such a transition, re-enable a destination
+beacon with End. If navigation reports that its readout is unavailable or
+incomplete, do not treat silence as an all-clear.
+
+**NPC and item detection are not enabled yet.** Their F3 sounds are placeholders
+for later work, not evidence that a person or object is nearby. Only explicitly
+configured destinations are currently listed; this is not a complete world scanner.
+
+### Sound and destination customization
+
+The game directory's `Binaries\Win32\LISAccess\navigation.ini` sets default
+obstacle-cue state and `Volume` (0.0 to 1.0). F2 changes the current session only.
+Keep `Diagnostics=0` except when collecting a requested development log.
+
+Replace `obstacle.wav`, `person.wav`, `object.wav` or `destination.wav` in
+`Binaries\Win32\LISAccess\audio` to try different sounds. Use mono PCM16 WAV,
+8–48 kHz, at most two seconds and 256 KiB. Very short sounds work best: the supplied
+obstacle cue is 160 ms; busy cues are dropped rather than queued. Restart the game
+after editing settings or replacing sounds. The four supplied ElevenLabs sounds
+are placeholders for listening feedback, not final sound design.
+
+The INI's `[Landmarks]` section can add or relabel destinations by mapping a
+spoken name to an existing actor's full object path. This supports additional
+authored landmarks without recompiling; it does not discover useful destinations
+automatically. Only matching actors in the active world qualify. Internal paths
+belong in this configuration or diagnostic tools, never ordinary speech.
 
 ## Reversible installation
 
-The development installation adds only `dinput8.dll` and
-`nvdaControllerClient32.dll` beside the game executable. It does not patch the
+The development installation adds `dinput8.dll`, `nvdaControllerClient32.dll`
+and the `LISAccess` settings/audio directory beside the game executable. It does not patch the
 executable, cooked assets, Steam app IDs or saves. Normal game actions can still
 create/update saves and settings as usual.
 
@@ -61,8 +131,10 @@ To remove only the recorded, unchanged prototype DLLs, run from this repository:
 powershell -NoProfile -File scripts/remove-prototype.ps1
 ```
 
-If removal reports a changed file, investigate rather than deleting it blindly.
-Logs and game saves are not removed.
+If removal reports a changed DLL, investigate rather than deleting it blindly.
+Updates and removal preserve customized settings and replacement sounds; unchanged
+owned files are removable. Logs and game saves are not removed. Empty data folders
+may remain after removal.
 
 ## Development and live inspection
 
@@ -78,6 +150,12 @@ The native bridge runs read-only GFx queries on the game's window/game thread.
 `GetText` result through local request/response files. It does not provide arbitrary
 native calls, script evaluation or action activation. `tools/live_inspect.py` and
 `tools/live_objects.py` provide external, read-only registry/object snapshots.
+
+Navigation samples game collision on the same thread. Indexed-native Trace needs
+a narrowly scoped, immediately restored dispatch-metadata adapter; it does not
+activate actors or change world/save state. Both event dispatchers require three
+stack arguments, including the legacy result slot. Live scene validation remains
+separate from the engine-free geometry, native-ABI and installer tests.
 
 Diagnostics are written to `%LOCALAPPDATA%\LISAccess\prototype.log`; menu text may
 appear there. Treat logs and ignored `artifacts/` as private development data.
