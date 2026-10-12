@@ -3,12 +3,14 @@
 #include "world_probe.h"
 #include "audio_cues.h"
 #include "platform.h"
+#include "input_commands.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <mutex>
 #include <string>
 #include <vector>
+#include <Xinput.h>
 
 namespace lis::navigation {
 namespace {
@@ -18,11 +20,27 @@ ULONGLONG stamp = 0;
 std::vector<world::Landmark> landmarks;
 bool configured = false, audioReady = false, obstacles = false, beacon = false;
 bool wasActive = false, diagnostics = false, previewPending = false, warnedIncomplete = false;
+bool warnedInteractions=false;
 int preview = -1;
 ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, previewUntil = 0, logAt = 0;
 std::string selected;
-constexpr int Keys[] = {VK_PRIOR,VK_NEXT,VK_HOME,VK_HOME,VK_F1,VK_F2,VK_F3};
-bool down[7]{};
+std::wstring FocusText(const world::Snapshot& s);
+std::wstring ActionText(const world::Snapshot& s);
+input::Keyboard keyboard;
+input::Controller controllerInput;
+HMODULE xinputModule=nullptr;
+using GetPadState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
+GetPadState getPadState=nullptr;
+int padIndex=0;
+int previousPadIndex=-1;
+bool padWasConnected=false;
+int pendingAction=-1;
+std::string pendingFocus,pendingFace,seenFocus,spokenFocus;
+std::string aimingAt,faceReply;
+bool faceSubmitted=false;
+ULONGLONG aimDeadline=0;
+std::wstring feedback;
+ULONGLONG focusSince=0;
 std::string Utf8(const std::wstring& text) {
     int n = WideCharToMultiByte(CP_UTF8,0,text.data(),static_cast<int>(text.size()),nullptr,0,nullptr,nullptr);
     std::string s(n,'\0');
@@ -40,6 +58,11 @@ std::wstring Describe(const world::Snapshot& s, const world::Target& t) {
     std::wstring text=t.label+L", "+navmath::Direction(Bearing(s,t))+L", "+navmath::Distance(distance,s.radius);
     if(t.position.z-s.player.z > s.halfHeight*2) text+=L", above";
     else if(s.player.z-t.position.z > s.halfHeight*2) text+=L", below";
+    if(t.kind!=world::Kind::Destination) {
+        if(t.stableId==s.focusedId){text+=L". Focused";const auto actions=ActionText(s);if(!actions.empty())text+=L". "+actions;}
+        else text+=L". Not focused. Face this target before choosing an action.";
+        if(t.angleRestricted)text+=L" Try facing or approaching it from another direction.";
+    }
     return text;
 }
 audio::Cue CueFor(world::Kind kind) {
@@ -48,11 +71,34 @@ audio::Cue CueFor(world::Kind kind) {
     return audio::Cue::Object;
 }
 const wchar_t* PreviewName(int i) {
-    const wchar_t* names[]={L"Obstacle",L"Person. Detection not implemented yet",L"Object. Detection not implemented yet",L"Destination"};
+    const wchar_t* names[]={L"Obstacle",L"Person",L"Object",L"Destination"};
     return names[i];
+}
+std::wstring ActionText(const world::Snapshot& s) {
+    std::wstring text;
+    static const wchar_t* pad[]={L"Y",L"X",L"B",L"A"};
+    for(size_t i=0;i<s.actions.size();++i)if(!s.actions[i].label.empty()) {
+        if(!text.empty())text+=L". ";
+        std::wstring label=s.actions[i].label;
+        while(!label.empty()&&(label.back()==L'.'||label.back()==L' '))label.pop_back();
+        text+=label+L", "+(s.gamepad ? std::wstring(pad[i]) : std::to_wstring(i+1));
+    }
+    return text;
+}
+std::wstring FocusText(const world::Snapshot& s) {
+    std::wstring text=s.focusedLabel;const auto actions=ActionText(s);
+    if(!actions.empty()){if(!text.empty())text+=text.back()==L'.'?L" ":L". ";text+=actions;}
+    return text;
 }
 }
 void Initialize(HMODULE module) {
+    for(const wchar_t* library:{L"xinput1_4.dll",L"xinput1_3.dll",L"xinput9_1_0.dll"}) {
+        xinputModule=LoadLibraryExW(library,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+        if(!xinputModule)continue;
+        getPadState=reinterpret_cast<GetPadState>(GetProcAddress(xinputModule,"XInputGetState"));
+        if(getPadState)break;
+        FreeLibrary(xinputModule);xinputModule=nullptr;
+    }
     wchar_t path[32768]{}; GetModuleFileNameW(module,path,ARRAYSIZE(path));
     const auto ini=std::filesystem::path(path).parent_path()/L"LISAccess"/L"navigation.ini";
     obstacles=GetPrivateProfileIntW(L"Navigation",L"ObstacleCues",0,ini.c_str())!=0;
@@ -80,25 +126,47 @@ void Tick() {
     if(!configured) {world::SetLandmarks(landmarks);configured=true;}
     world::Snapshot sample;
     world::Sample(sample);
+    int action=-1;std::string expected,face;
+    {std::lock_guard<std::mutex> lock(mutex);action=pendingAction;pendingAction=-1;expected.swap(pendingFocus);face.swap(pendingFace);}
+    std::wstring reply;bool submitted=false;
+    if(action>=0) {
+        reply=world::ActivateFocused(expected,static_cast<unsigned>(action));
+        sample.focusedId.clear();sample.focusedLabel.clear();sample.actions={};
+    }
+    else if(!face.empty())reply=world::FaceTarget(face,submitted);
     std::lock_guard<std::mutex> lock(mutex);
+    if(!face.empty()){faceReply=face;faceSubmitted=submitted;}
+    if(!reply.empty())feedback=std::move(reply);
     latest=std::move(sample);stamp=GetTickCount64();
 }
 void Pump(bool foreground, bool readableMenu) {
     const auto now=GetTickCount64();
-    bool pressed[7]{};
-    const bool modified=(GetAsyncKeyState(VK_CONTROL)&0x8000)||(GetAsyncKeyState(VK_MENU)&0x8000);
-    const bool shift=(GetAsyncKeyState(VK_SHIFT)&0x8000)!=0;
-    for(size_t i=0;i<7;++i) {
-        const bool value=(GetAsyncKeyState(Keys[i])&0x8000)!=0;
-        pressed[i]=foreground && !modified && (i==3 ? shift : !shift) && value && !down[i];down[i]=value;
-    }
+    input::Presses raw{};
+    for(size_t i=0;i<input::Count;++i)raw[i]=(GetAsyncKeyState(input::Keys[i])&0x8000)!=0;
+    const input::Modifiers modifiers{(GetAsyncKeyState(VK_SHIFT)&0x8000)!=0,(GetAsyncKeyState(VK_CONTROL)&0x8000)!=0,(GetAsyncKeyState(VK_MENU)&0x8000)!=0};
+    auto pressed=keyboard.Update(raw,modifiers,foreground,now);
     world::Snapshot s;ULONGLONG at=0;
-    {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;}
+    std::wstring reply;std::string completedFace;bool submitted=false;
+    {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;reply.swap(feedback);completedFace.swap(faceReply);submitted=faceSubmitted;}
+    if(completedFace==aimingAt&&!submitted)aimingAt.clear();
+    if(foreground&&!reply.empty())Speak(reply);
     const bool fresh=at && now-at<=450;
-    const bool active=foreground && fresh && s.active && !readableMenu;
+    const bool active=foreground && fresh && s.active && !s.interactionBusy && !readableMenu;
+    if(s.controllerIndex>=0&&s.controllerIndex<4)padIndex=s.controllerIndex;
+    XINPUT_STATE pad{};
+    const bool connected=getPadState&&getPadState(static_cast<DWORD>(padIndex),&pad)==ERROR_SUCCESS;
+    if(connected&&(!padWasConnected||previousPadIndex!=padIndex))controllerInput.Update(pad.Gamepad.wButtons,false,now);
+    const auto padPresses=controllerInput.Update(connected?pad.Gamepad.wButtons:0,active&&connected,now);
+    padWasConnected=connected;previousPadIndex=padIndex;
+    if(std::any_of(padPresses.begin(),padPresses.end(),[](bool value){return value;}))s.gamepad=true;
+    else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;}))s.gamepad=false;
+    for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
+    if(foreground&&s.interactionsFailed&&!warnedInteractions){Speak(L"Interaction scanning failed and has been disabled. Navigation is still available.");warnedInteractions=true;}
     if(!foreground || (!active && !readableMenu)) {
         audio::SetEnabled(false);previewPending=false;
         if(wasActive) beacon=false;
+        seenFocus.clear();spokenFocus.clear();
+        aimingAt.clear();
         if(foreground && !readableMenu && (pressed[4]||pressed[5]||pressed[0]||pressed[1]||pressed[2]||pressed[3]))
             Speak(L"Navigation unavailable here. No collision guidance is available.");
         wasActive=false;
@@ -106,13 +174,31 @@ void Pump(bool foreground, bool readableMenu) {
     }
     if(!active && wasActive) beacon=false;
     wasActive=active;
+    if(active) {
+        if(!aimingAt.empty()) {
+            if(s.focusedId==aimingAt)aimingAt.clear();
+            else if(now>=aimDeadline){Speak(L"That target did not become focused. Try moving closer or aiming manually.");aimingAt.clear();}
+        }
+        std::string signature=s.focusedId;
+        if(!signature.empty())signature+='|'+Utf8(FocusText(s));
+        if(signature!=seenFocus){seenFocus=signature;focusSince=now;if(signature.empty())spokenFocus.clear();}
+        if(!seenFocus.empty()&&spokenFocus!=seenFocus&&now-focusSince>=200&&std::none_of(pressed.begin(),pressed.end(),[](bool value){return value;})) {
+            Speak(FocusText(s));spokenFocus=seenFocus;
+        }
+        for(unsigned slot=0;slot<4;++slot)if(pressed[8+slot]) {
+            if(!aimingAt.empty()||pressed[7])Speak(L"Wait for the target's focused-object announcement before choosing an action.");
+            else if(s.focusedId.empty()||s.actions[slot].label.empty())Speak(L"That action is not available. Face an object to hear its actions.");
+            else {std::lock_guard<std::mutex> lock(mutex);pendingFocus=s.focusedId;pendingAction=static_cast<int>(slot);}
+            break;
+        }
+    }
     if(pressed[6]) {
         preview=(preview+1)%4;
         audio::StopAll();
         if(!audio::Available(static_cast<audio::Cue>(preview))) {
             Speak(L"That cue is missing or invalid. Check the navigation audio files.");previewPending=false;
         } else {
-            Speak(PreviewName(preview));previewAt=now+(preview==1||preview==2 ? 2200 : 700);previewPending=true;
+            Speak(PreviewName(preview));previewAt=now+700;previewPending=true;
         }
     }
     // Preview is explicit, never automatic, and is the only audio allowed in menus.
@@ -125,7 +211,7 @@ void Pump(bool foreground, bool readableMenu) {
     }
     if(now<previewUntil) return;
     if(!active) { if(now>=previewAt+700) audio::SetEnabled(false);return; }
-    if(pressed[4]) Speak(L"Navigation prototype. Use the game's movement controls and mouse to turn the camera. F2 toggles obstacle cues. Page Down and Page Up select destinations. Home describes the selected target. Shift Home toggles its beacon. Lower-pitched beacon pulses mean behind you. F3 previews sounds. The beacon gives direction, not a clear route. R remains rewind.");
+    if(pressed[4]) Speak(L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. On a controller: D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face. Native Y, X, B and A keep their announced actions. F2 toggles obstacle cues; F3 previews sounds. Hold the left stick and press D pad down for obstacle cues, up for help, or left or right for sound previews. Beacons give direction, not a safe route. R remains rewind.");
     if(pressed[5]) {
         obstacles=!obstacles;
         if(obstacles && !audio::Available(audio::Cue::Obstacle)) {obstacles=false;Speak(L"Obstacle sound is unavailable.");}
@@ -138,7 +224,7 @@ void Pump(bool foreground, bool readableMenu) {
         selected.clear();if(beacon) Speak(L"Target is no longer available. Beacon off.");beacon=false;
     }
     if(pressed[0]||pressed[1]) {
-        if(s.targets.empty()) Speak(L"No supported navigation targets here.");
+        if(s.targets.empty()) Speak(s.interactionStatus=="ready" ? L"No supported navigation targets here." : L"Interaction scanning is unavailable. No navigation landmarks here.");
         else {
             int index=current==s.targets.end() ? (pressed[0] ? 0 : -1) : static_cast<int>(current-s.targets.begin());
             index=(index+(pressed[0] ? -1 : 1)+static_cast<int>(s.targets.size()))%static_cast<int>(s.targets.size());
@@ -146,7 +232,19 @@ void Pump(bool foreground, bool readableMenu) {
             Speak(Describe(s,*current));nextBeacon=now+650;
         }
     }
-    if(pressed[2]) Speak(current==s.targets.end() ? L"No target selected. Use Page Down to select one." : Describe(s,*current));
+    if(pressed[2]) {
+        if(current!=s.targets.end())Speak(Describe(s,*current));
+        else if(!s.focusedId.empty())Speak(FocusText(s));
+        else if(s.interactionStatus!="ready")Speak(L"Interaction scanning is unavailable.");
+        else Speak(s.gamepad ? L"No target selected. Use D pad left or right." : L"No target selected. Use Page Down to select one.");
+    }
+    if(pressed[7]) {
+        if(current==s.targets.end())Speak(L"No target selected. Select one first.");
+        else {
+            if(current->kind!=world::Kind::Destination&&current->stableId!=s.focusedId){aimingAt=current->stableId;aimDeadline=now+1500;}
+            std::lock_guard<std::mutex> lock(mutex);pendingAction=-1;pendingFocus.clear();pendingFace=current->stableId;
+        }
+    }
     if(pressed[3]) {
         if(current==s.targets.end()) Speak(L"No target selected. Use Page Down to select one.");
         else if(!audio::Available(CueFor(current->kind))) Speak(L"The target sound is unavailable.");
@@ -177,5 +275,5 @@ void Pump(bool foreground, bool readableMenu) {
         nextBeacon=now+navmath::Interval(Distance(s,*current),s.radius*50);
     }
 }
-void Shutdown() {audio::Shutdown();}
+void Shutdown() {audio::Shutdown();if(xinputModule){FreeLibrary(xinputModule);xinputModule=nullptr;getPadState=nullptr;}}
 }

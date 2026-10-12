@@ -267,7 +267,7 @@ void RunRuntime(HMODULE module) {
         localDirectory = std::wstring(directory) + L"\\LISAccess"; CoTaskMemFree(directory);
     }
     Log("event=prototype_start pid=" + std::to_string(GetCurrentProcessId()) + " build=2304417 compiled=\"" __DATE__ " " __TIME__ "\"");
-    Speak(L"Life Is Strange accessibility prototype loaded.");
+    Speak(L"Life Is Strange accessibility mod loaded.");
     tickMessage = RegisterWindowMessageW(L"LISAccess.ReadOnlyMenuProbe.v1");
     for (int n=0; n<300 && !window; ++n) { EnumWindows(FindWindow, 0); if (!window) Sleep(100); }
     if (!window) { Log("event=no_game_window"); Speak(L"Could not attach menu inspection."); return; }
@@ -288,7 +288,7 @@ void RunRuntime(HMODULE module) {
     bool wasForeground = false;
     while (IsWindow(window)) {
         Files();
-        if (failed && !faultSpoken) { Speak(L"Menu inspection failed and has been disabled. See the prototype log."); faultSpoken = true; }
+        if (failed && !faultSpoken) { Speak(L"Menu inspection failed and has been disabled. See the mod log."); faultSpoken = true; }
         std::wstring speech;
         bool readableMenu = false;
         const bool foreground = IsGameForeground();
@@ -298,7 +298,7 @@ void RunRuntime(HMODULE module) {
             if (!speech.empty()) lastSpeech = speech;
             if (foreground && !wasForeground && speech.empty() && hasMenu) speech = lastSpeech;
             if (repeat.exchange(false)) speech = lastSpeech;
-            if (help.exchange(false)) speech = L"Menu prototype. Use the game's arrow keys, Enter to select and Escape to go back. R repeats. F1 reads this help. F3 previews navigation sounds. Navigation controls become available during gameplay.";
+            if (help.exchange(false)) speech = L"Menu controls. Use the game's arrow keys, Enter to select and Escape to go back, or the controller's native menu buttons. R repeats. F1 reads this help. F3 previews navigation sounds. Scanner controls become available during gameplay.";
             readableMenu = hasMenu;
         }
         if (!speech.empty() && foreground) Speak(speech);

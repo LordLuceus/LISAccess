@@ -1,17 +1,20 @@
-# LISAccess — accessibility prototype
+# LISAccess — accessibility mod
 
-This is a private prototype for **original Life Is Strange on Windows
+This is a private, early-development mod for **original Life Is Strange on Windows
 (Steam build 2304417)**. It is not for the remaster or Before the Storm.
 
 The title, save-slot picker and main-menu narration are the accepted baseline.
 An **experimental opening-navigation layer** has been used successfully to reach
 the lighthouse and enter the next scene. Cue balance at normal game volume still
-needs listening feedback. This is not complete gameplay accessibility, and silence
-never means that an area is safe.
+needs listening feedback. The corrected scanner and interactions have been
+playtested through the classroom selfie, including automatic target announcements
+while aiming with the right stick. Dialogue-choice accessibility is the next gap.
+This is not complete gameplay accessibility, and silence never means that an area
+is safe.
 
 ## What it does
 
-- Announces that the prototype loaded, using NVDA when available, with Windows
+- Announces that the mod loaded, using NVDA when available, with Windows
   SAPI as a fallback.
 - Reads the game's actual focused title/menu button, rather than estimating
   selection from keypresses.
@@ -40,36 +43,87 @@ use; existing saves are not disposable test data.
 | Arrow keys | The game's menu navigation |
 | Enter | The game's accept/select action |
 | Escape | The game's back/cancel action |
-| R | Repeat the last current menu readout while the prototype has readable menu focus |
+| R | Repeat the last current menu readout while the mod has readable menu focus |
 | F1 | Read help for readable menu focus, or navigation help during supported gameplay |
 | F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
 
-R remains the game's rewind key outside menu narration. Navigation shortcuts
-ignore Ctrl and Alt; Shift+Home is the only shifted shortcut. Native movement
-bindings are not changed.
+R remains the game's rewind key outside menu narration. Native movement bindings
+are not changed. Scanner shortcuts ignore Ctrl and Alt; Shift+Home is the one
+shifted shortcut. Controller menus keep their native controls. Controller scanner
+commands, including sound preview, run in gameplay only; keyboard F3 also works
+in readable menus.
 
-## Opening navigation (experimental)
+## Navigation and interactions (experimental)
 
 > This is a first navigation design to try, not a settled interface. The cues and
 > controls may change or be replaced after listening and walking tests. Feedback
 > on whether they are useful matters as much as whether they fire correctly. The
 > accepted menu narration is separate from this experimental navigation layer.
 
-Use the game's movement controls and mouse to turn the camera. There is no
-auto-walk, automatic turning, route planner or automatic interaction. Audio
-direction is relative to the camera, not Max's body orientation.
+Use the game's movement controls, mouse or right stick normally. There is no
+auto-walk, route planner or automatic interaction. Camera facing is an explicit
+command, not a side effect of browsing the scanner. Audio direction is relative
+to the camera, not Max's body orientation.
 
 | Key | Navigation action (experimental) |
 |---|---|
 | F2 | Toggle obstacle proximity cues; initially off |
-| Page Down / Page Up | Select next / previous supported destination |
-| Home | Describe the selected destination and its current direction |
-| Shift+Home | Toggle the selected destination's directional beacon |
+| Page Down / Page Up | Select next / previous scanner target; hold to repeat |
+| Home | Describe the selected target; with no selection, repeat focused-object actions |
+| Shift+Home | Toggle the selected target's directional beacon |
+| F | Request camera facing toward the selected target |
+| Number row 1, 2, 3, 4 | Use the focused object's announced action; equivalents of controller Y, X, B, A |
 | F1 | Read navigation help |
 | F3 | Preview the next sound: obstacle, person, object, destination |
 
-End remains the game's alternate diary key; toggling a beacon no longer opens
-the diary. Controller navigation commands are not implemented yet.
+End is left entirely to the game's diary binding. Action keys never auto-repeat.
+
+### Controller controls (experimental)
+
+These require an XInput-compatible controller, including one presented as XInput
+by Steam Input. Button names use Xbox terminology. The mappings still need
+in-game conflict testing. Scanner controls stand down while the native debug
+menu is active or visible, since it also uses the D-pad.
+
+| Controller input | Gameplay action |
+|---|---|
+| D-pad left / right | Previous / next scanner target; hold to repeat |
+| D-pad up | Describe the selected target or focused-object actions |
+| D-pad down | Toggle the selected target's beacon |
+| Click the left stick | Face the selected target on button release |
+| Hold left-stick click + D-pad down | Toggle obstacle cues |
+| Hold left-stick click + D-pad up | Read help |
+| Hold left-stick click + D-pad left or right | Preview the next sound |
+| Y, X, B, A | The game's native actions, announced with their button names |
+
+A left-stick chord does not also trigger facing on release. Native face buttons
+are not emulated or duplicated, and the mod does not force an input-mode switch.
+
+### Selecting and using an object
+
+Select an object with Page Up/Down or D-pad left/right, then press F or click the
+left stick to face it. **Wait for the focused-object announcement and its action
+keys/buttons before acting.** Selecting a scanner entry does not itself change
+the game's focus. Action shortcuts and native face buttons refer to that focus,
+not an unfocused scanner selection. Original mouse interactions still work.
+
+The scanner uses the game's labels and native story, inventory, one-shot and
+angle checks. Angle-restricted targets are identified so you can try another
+approach. It lists up to 32 qualifying nearby interactions plus configured
+landmarks, prioritizing the actual focused object. This is not a complete room
+description or cast list; occluded objects may still need a different approach.
+Some characters can use the generic object sound when their data does not
+identify a character name.
+
+Facing supports the normal basic camera and clamps requests to its authored
+pitch bounds. Fixed, dialogue, derived or multiple-active-behaviour camera modes
+are refused; other transitions still need testing.
+Collision, camera offsets and native interaction priority can prevent focus.
+“Turning toward” acknowledges a request, not successful focus: listen for the
+actual object/action announcement, and move closer or aim manually if necessary.
+The successful classroom test does not prove every action or camera mode.
+
+### Beacons and obstacles
 
 The initial destination is **Lighthouse approach**, attached to an authored
 opening-scene trigger. Its beacon is a bearing to that point, **not a walkable
@@ -88,12 +142,14 @@ movement nor guarantee that a passage is clear.
 Navigation requires a verified controllable player and a positive floor query.
 It stops when the game loses focus, controls are unavailable, a menu is active,
 or the snapshot becomes stale. After such a transition, re-enable a destination
-beacon with Shift+Home. If navigation reports that its readout is unavailable or
+beacon with Shift+Home or D-pad down. If navigation reports that its readout is unavailable or
 incomplete, do not treat silence as an all-clear.
 
-**NPC and item detection are not enabled yet.** Their F3 sounds are placeholders
-for later work, not evidence that a person or object is nearby. Only explicitly
-configured destinations are currently listed; this is not a complete world scanner.
+Person and object sounds are now used by their target beacons. F3 is only a
+preview, not evidence of a nearby object. Scanner controls remain gated by the
+verified player, floor and gameplay state.
+If interaction data cannot be read, the scanner reports that it is unavailable
+rather than claiming that no targets exist.
 
 ### Sound and destination customization
 
@@ -123,9 +179,9 @@ create/update saves and settings as usual.
 
 The installer refuses an unsupported executable or an unrelated/changed DLL. Its
 ownership record is `%LOCALAPPDATA%\LISAccess\install.json`. Close the game before
-installing, updating or removing the prototype.
+installing, updating or removing the mod.
 
-To remove only the recorded, unchanged prototype DLLs, run from this repository:
+To remove only the recorded, unchanged mod DLLs, run from this repository:
 
 ```powershell
 powershell -NoProfile -File scripts/remove-prototype.ps1
@@ -145,7 +201,7 @@ powershell -NoProfile -File scripts/build.ps1
 ctest --test-dir build-x86 -C Release --output-on-failure
 ```
 
-The native bridge runs read-only GFx queries on the game's window/game thread.
+Menu inspection runs read-only GFx queries on the game's window/game thread.
 `tools/probe_runtime.py` requests a number, string or a known menu object's
 `GetText` result through local request/response files. It does not provide arbitrary
 native calls, script evaluation or action activation. `tools/live_inspect.py` and
@@ -155,7 +211,10 @@ Navigation samples game collision on the same thread. Indexed-native Trace needs
 a narrowly scoped, immediately restored dispatch-metadata adapter; it does not
 activate actors or change world/save state. Both event dispatchers require three
 stack arguments, including the legacy result slot. Live scene validation remains
-separate from the engine-free geometry, native-ABI and installer tests.
+separate from engine-free geometry, input-command, native-ABI and installer tests.
+Player-requested actions use the native interaction listener and guarded request
+path; facing uses a checked camera request. Both run on the game thread, not the
+input/speech worker. Inspection request files do not expose these actions.
 
 Diagnostics are written to `%LOCALAPPDATA%\LISAccess\prototype.log`; menu text may
 appear there. Treat logs and ignored `artifacts/` as private development data.
