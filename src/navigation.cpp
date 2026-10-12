@@ -21,7 +21,7 @@ bool wasActive = false, diagnostics = false, previewPending = false, warnedIncom
 int preview = -1;
 ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, previewUntil = 0, logAt = 0;
 std::string selected;
-constexpr int Keys[] = {VK_PRIOR,VK_NEXT,VK_HOME,VK_END,VK_F1,VK_F2,VK_F3};
+constexpr int Keys[] = {VK_PRIOR,VK_NEXT,VK_HOME,VK_HOME,VK_F1,VK_F2,VK_F3};
 bool down[7]{};
 std::string Utf8(const std::wstring& text) {
     int n = WideCharToMultiByte(CP_UTF8,0,text.data(),static_cast<int>(text.size()),nullptr,0,nullptr,nullptr);
@@ -86,10 +86,11 @@ void Tick() {
 void Pump(bool foreground, bool readableMenu) {
     const auto now=GetTickCount64();
     bool pressed[7]{};
-    const bool modified=(GetAsyncKeyState(VK_CONTROL)&0x8000)||(GetAsyncKeyState(VK_MENU)&0x8000)||(GetAsyncKeyState(VK_SHIFT)&0x8000);
+    const bool modified=(GetAsyncKeyState(VK_CONTROL)&0x8000)||(GetAsyncKeyState(VK_MENU)&0x8000);
+    const bool shift=(GetAsyncKeyState(VK_SHIFT)&0x8000)!=0;
     for(size_t i=0;i<7;++i) {
         const bool value=(GetAsyncKeyState(Keys[i])&0x8000)!=0;
-        pressed[i]=foreground && !modified && value && !down[i];down[i]=value;
+        pressed[i]=foreground && !modified && (i==3 ? shift : !shift) && value && !down[i];down[i]=value;
     }
     world::Snapshot s;ULONGLONG at=0;
     {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;}
@@ -124,7 +125,7 @@ void Pump(bool foreground, bool readableMenu) {
     }
     if(now<previewUntil) return;
     if(!active) { if(now>=previewAt+700) audio::SetEnabled(false);return; }
-    if(pressed[4]) Speak(L"Navigation prototype. Use the game's movement controls and mouse to turn the camera. F2 toggles obstacle cues. Page Down and Page Up select destinations. Home describes the selected target. End toggles its beacon. Lower-pitched beacon pulses mean behind you. F3 previews sounds. The beacon gives direction, not a clear route. R remains rewind.");
+    if(pressed[4]) Speak(L"Navigation prototype. Use the game's movement controls and mouse to turn the camera. F2 toggles obstacle cues. Page Down and Page Up select destinations. Home describes the selected target. Shift Home toggles its beacon. Lower-pitched beacon pulses mean behind you. F3 previews sounds. The beacon gives direction, not a clear route. R remains rewind.");
     if(pressed[5]) {
         obstacles=!obstacles;
         if(obstacles && !audio::Available(audio::Cue::Obstacle)) {obstacles=false;Speak(L"Obstacle sound is unavailable.");}

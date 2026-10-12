@@ -1,12 +1,18 @@
 # LISAccess changelog
 
+## 2026-10-12 — Beacon shortcut correction
+
+- Moved the beacon toggle from End to Shift+Home so it no longer opens the diary.
+  Plain Home still describes the target; changing modifiers while holding Home
+  does not trigger another command.
+
 ## 2026-10-12 — Opening navigation (experimental)
 
 - Added optional directional obstacle cues, a possible-drop warning, and a
   selectable destination beacon. The initial lighthouse-approach destination has
   been used successfully to finish the opening and reach the next scene.
 - F2 toggles obstacle cues; Page Up/Down select a destination, Home describes it,
-  and End toggles its beacon. F1 reads navigation help and F3 previews sounds.
+  and Shift+Home toggles its beacon. F1 reads navigation help and F3 previews sounds.
 - Added replaceable ElevenLabs placeholder sounds and independent cue-volume
   settings. Custom settings and replacement sounds survive updates and removal.
 - Added configurable actor-based landmarks without requiring a rebuild.

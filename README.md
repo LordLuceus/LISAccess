@@ -44,8 +44,9 @@ use; existing saves are not disposable test data.
 | F1 | Read help for readable menu focus, or navigation help during supported gameplay |
 | F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
 
-R remains the game's rewind key outside menu narration. Navigation keys are plain
-keys, without Ctrl, Alt or Shift; native movement bindings are not changed.
+R remains the game's rewind key outside menu narration. Navigation shortcuts
+ignore Ctrl and Alt; Shift+Home is the only shifted shortcut. Native movement
+bindings are not changed.
 
 ## Opening navigation (experimental)
 
@@ -63,13 +64,12 @@ direction is relative to the camera, not Max's body orientation.
 | F2 | Toggle obstacle proximity cues; initially off |
 | Page Down / Page Up | Select next / previous supported destination |
 | Home | Describe the selected destination and its current direction |
-| End | Toggle the selected destination's directional beacon |
+| Shift+Home | Toggle the selected destination's directional beacon |
 | F1 | Read navigation help |
 | F3 | Preview the next sound: obstacle, person, object, destination |
 
-Known input conflict: End is also the game's alternate diary key. The opening
-route was tested successfully, but the beacon binding needs changing before wider
-gameplay use. Controller navigation commands are not implemented yet.
+End remains the game's alternate diary key; toggling a beacon no longer opens
+the diary. Controller navigation commands are not implemented yet.
 
 The initial destination is **Lighthouse approach**, attached to an authored
 opening-scene trigger. Its beacon is a bearing to that point, **not a walkable
@@ -88,7 +88,7 @@ movement nor guarantee that a passage is clear.
 Navigation requires a verified controllable player and a positive floor query.
 It stops when the game loses focus, controls are unavailable, a menu is active,
 or the snapshot becomes stale. After such a transition, re-enable a destination
-beacon with End. If navigation reports that its readout is unavailable or
+beacon with Shift+Home. If navigation reports that its readout is unavailable or
 incomplete, do not treat silence as an all-clear.
 
 **NPC and item detection are not enabled yet.** Their F3 sounds are placeholders
