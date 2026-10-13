@@ -9,6 +9,7 @@ $files=@(
     @{Source=(Join-Path $root 'build-x86\Release\dinput8.dll');Name='dinput8.dll'},
     @{Source=(Join-Path $root 'build-x86\Release\notices\Prism-NOTICES.txt');Name='LISAccess\notices\Prism-NOTICES.txt'},
     @{Source=(Join-Path $root 'build-x86\Release\notices\THIRD-PARTY-LICENSES.md');Name='LISAccess\notices\THIRD-PARTY-LICENSES.md'},
+    @{Source=(Join-Path $root 'build-x86\Release\notices\LICENSE.txt');Name='LISAccess\notices\LICENSE.txt'},
     @{Source=(Join-Path $root 'assets\navigation.ini');Name='LISAccess\navigation.ini';Editable=$true}
 )
 foreach($cue in @('obstacle','person','object','destination')){

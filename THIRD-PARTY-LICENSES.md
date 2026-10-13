@@ -1,6 +1,13 @@
-# Third-party components — private prototype
+# Code licence, third-party components and audio restrictions
 
 This prototype is not a public release package.
+
+## LISAccess code
+
+Original LISAccess code and documentation are covered by the MIT licence in
+`LICENSE`, copyright 2026 LordLuceus. The staged/installed copy is `LICENSE.txt`.
+This licence does **not** cover ElevenLabs-generated sound effects or third-party
+components. Their respective terms and obligations remain in force.
 
 ## Prism and bundled source
 
@@ -112,15 +119,31 @@ notes describe inspected source, not a legal certification of a built artifact.
 ## Navigation audio
 
 Playback uses the Windows-provided XAudio2 runtime; no XAudio2 redistributable is
-bundled. The four private placeholder cues were generated using the developer's
-authorized ElevenLabs CLI access. Prompts, processing and original provider bytes
-are recorded in `assets/audio/provenance.json` and beside the processed WAVs.
+bundled. The four cues were generated using the developer's authorized ElevenLabs
+CLI access. Prompts and processing are recorded in `assets/audio/provenance.json`;
+original provider bytes and processed WAVs are retained as private build inputs,
+not public repository files.
 
 The raw PCM response did not identify channel count, so the original channel
 interpretation remains provisional; these are processed placeholders, not a claim
 of exact provider-original timing or pitch. Listening feedback will decide whether
-to keep or replace them. Confirm the applicable account's output/distribution terms
-before any public release; these assets are not described as public-domain audio.
+to keep or replace them. These assets are not public-domain audio.
+
+[ElevenCreative Terms, Exhibit 4: Sound Effects](https://elevenlabs.io/creative-terms)
+permits incorporating Sound Effects output into games and applications, subject
+to the underlying agreement and Prohibited Use Policy. Commercial use is allowed
+only where the applicable plan permits it. The same exhibit restricts standalone
+exploitation and making output available as isolated audio files, samples or sound
+libraries, apart from its stated Community Sharing or express-permission exceptions.
+
+LISAccess distributes processed cues only as functional parts of complete mod
+release archives, combined with the mod's code and other material. It does not
+publish a standalone sound pack, individual audio downloads, raw PCM outputs or
+audio binaries in public Git history. Release archives must carry this notice and
+the MIT and third-party licence notices. The code's MIT licence does not grant
+independent reuse rights to these sounds; do not redistribute them separately
+without rights permitting that use. This distribution policy does not waive any
+underlying ElevenLabs terms or applicable commercial-plan restrictions.
 
 ## Research-only software
 

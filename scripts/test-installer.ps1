@@ -34,13 +34,14 @@ try {
     foreach($cue in @('obstacle','person','object','destination')){
         [IO.File]::WriteAllText((Join-Path $package "assets\audio\$cue.wav"),'dummy audio fixture')
     }
-    foreach($notice in @('Prism-NOTICES.txt','THIRD-PARTY-LICENSES.md')){
+    foreach($notice in @('Prism-NOTICES.txt','THIRD-PARTY-LICENSES.md','LICENSE.txt')){
         [IO.File]::WriteAllText((Join-Path $package "build-x86\Release\notices\$notice"),'notice fixture; not distribution license text')
     }
     $dll=Join-Path $game 'dinput8.dll'
     $legacy=Join-Path $game 'nvdaControllerClient32.dll'
     $manifestPath=Join-Path $env:LOCALAPPDATA 'LISAccess\install.json'
     $noticePath=Join-Path $game 'LISAccess\notices\Prism-NOTICES.txt'
+    $licensePath=Join-Path $game 'LISAccess\notices\LICENSE.txt'
     $config=Join-Path $game 'LISAccess\navigation.ini'
     $audio=Join-Path $game 'LISAccess\audio\person.wav'
 
@@ -50,7 +51,13 @@ try {
     Expect-Blocked { & $install -GameDirectory $game } 'Missing build/input'
     Assert (-not(Test-Path $dll)) 'Missing-notice preflight wrote a DLL'
     Move-Item -LiteralPath ($noticeSource+'.held') -Destination $noticeSource
+    $licenseSource=Join-Path $package 'build-x86\Release\notices\LICENSE.txt'
+    Move-Item -LiteralPath $licenseSource -Destination ($licenseSource+'.held')
+    Expect-Blocked { & $install -GameDirectory $game } 'Missing build/input'
+    Assert (-not(Test-Path $dll)) 'Missing-MIT preflight wrote a DLL'
+    Move-Item -LiteralPath ($licenseSource+'.held') -Destination $licenseSource
     & $install -GameDirectory $game
+    Assert ((Get-FileHash -LiteralPath $licensePath).Hash -eq (Get-FileHash -LiteralPath $licenseSource).Hash) 'MIT licence missing from installation'
     Assert (-not(Test-Path $legacy)) 'Fresh install deployed an external controller'
     $before=Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
     & $install -GameDirectory $game
@@ -76,6 +83,7 @@ try {
     [IO.File]::WriteAllText($unknownNotice,'unowned notice')
     & $uninstall
     Assert (-not(Test-Path $dll) -and -not(Test-Path $noticePath)) 'Owned DLL/notice cleanup failed'
+    Assert (-not(Test-Path $licensePath)) 'Owned MIT licence was not removed'
     Assert (Test-Path $unknownNotice) 'Uninstaller recursively removed unowned notices'
     Assert ((Get-FileHash -LiteralPath $config).Hash -eq $customHash) 'Uninstaller removed customized settings'
     Assert ((Get-FileHash -LiteralPath $audio).Hash -eq $audioHash) 'Uninstaller removed customized audio'

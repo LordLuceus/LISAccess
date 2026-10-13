@@ -48,4 +48,6 @@ New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 [IO.File]::WriteAllText((Join-Path $OutputDirectory 'Prism-NOTICES.txt'),$text,[Text.UTF8Encoding]::new($false))
 $document=[IO.File]::ReadAllText((Join-Path $root 'THIRD-PARTY-LICENSES.md')).Replace("`r`n","`n")
 [IO.File]::WriteAllText((Join-Path $OutputDirectory 'THIRD-PARTY-LICENSES.md'),$document,[Text.UTF8Encoding]::new($false))
+$license=[IO.File]::ReadAllText((Join-Path $root 'LICENSE')).Replace("`r`n","`n")
+[IO.File]::WriteAllText((Join-Path $OutputDirectory 'LICENSE.txt'),$license,[Text.UTF8Encoding]::new($false))
 Write-Output "Staged Prism notices in $OutputDirectory"

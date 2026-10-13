@@ -1,6 +1,6 @@
 # LISAccess — accessibility mod
 
-This is a private, early-development mod for **original Life Is Strange on Windows
+This is an early-development mod for **original Life Is Strange on Windows
 (Steam build 2304417)**. It is not for the remaster or Before the Storm.
 
 The title, save-slot picker and main-menu narration are the accepted baseline.
@@ -11,6 +11,20 @@ playtested through the classroom selfie, including automatic target announcement
 while aiming with the right stick. Dialogue-choice accessibility is the next gap.
 This is not complete gameplay accessibility, and silence never means that an area
 is safe.
+
+## Licence and sound assets
+
+LISAccess's original code and documentation are licensed under the
+[MIT licence](LICENSE). This does **not** license the ElevenLabs-generated sounds
+or third-party components; see the [third-party and audio notices](THIRD-PARTY-LICENSES.md).
+
+The public source repository contains no audio binaries. Configuration,
+provenance and processing scripts remain available. Processed sound effects are
+distributed only as functional cues bundled with complete mod release archives,
+not as a standalone sound pack. Raw provider PCM files remain private and are
+never included in releases. Release archives must include the MIT licence,
+third-party notices and audio restrictions; the MIT licence grants no independent
+reuse rights to the sounds.
 
 ## What it does
 
@@ -245,7 +259,7 @@ powershell -NoProfile -File scripts/install-prototype.ps1
 Upgrading removes the old `nvdaControllerClient32.dll` only when it still matches
 the mod's ownership record. A modified or unowned copy is preserved and reported;
 the new mod does not use it. The build stages the required
-[third-party notices](THIRD-PARTY-LICENSES.md), and installation requires them.
+[third-party notices](THIRD-PARTY-LICENSES.md) and MIT licence; installation requires both.
 
 To remove only the recorded, unchanged mod DLLs, run from this repository:
 
@@ -269,6 +283,15 @@ SHA-256-verified Prism source archive and builds it for **Win32**, not x64:
 powershell -NoProfile -File scripts/build.ps1
 ctest --test-dir build-x86 -C Release --output-on-failure
 ```
+
+Compiling the code and running its tests does not require the private audio.
+Installing does: supply licensed `obstacle.wav`, `person.wav`, `object.wav` and
+`destination.wav` in `assets/audio/`, or use a complete mod release for installation.
+These local files are ignored by Git. Development worktrees can copy the local
+audio inputs from the primary checkout using `.worktreeinclude`; a fresh clone
+does not acquire them automatically. `scripts/generate-cues.ps1` is an optional
+maintainer processing step requiring the private PCM inputs; it does not download
+sounds or call the generation service.
 
 For a real 32-bit output-backend readiness check without launching the game:
 

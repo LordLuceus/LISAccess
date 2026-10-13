@@ -1,8 +1,79 @@
+# Private research, extracted game data, logs, rollbacks and agent settings.
 artifacts/
-build-x86/
-__pycache__/
 .letta
 
-# Provider audio stays private, including in historical checkouts.
-/assets/audio/*.pcm
-/assets/audio/*.wav
+# CMake/MSVC build products, including builds outside the documented x86 folder.
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+_deps/
+CMakeUserPresets.json
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+*.obj
+*.o
+*.lib
+*.a
+*.dll
+*.exe
+*.pdb
+*.exp
+*.ilk
+*.pch
+*.idb
+*.tlog
+
+# Research-helper dependencies and language caches.
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.class
+
+# Local credentials. Only deliberately sanitized example environment files belong.
+.env
+.env.*
+!.env.example
+credentials.json
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Provider audio is private build input, not MIT-licensed repository content.
+# Only processed cues incorporated into complete mod releases are distributed.
+*.pcm
+*.wav
+
+# Extra guardrails if game payloads/captures escape artifacts/.
+*.upk
+*.umap
+*.u
+*.gfx
+*.swf
+*.bik
+*.wem
+*.bnk
+*.sav
+*.dmp
+*.mdmp
+*.log
+
+# Editor/OS leftovers.
+*.bak
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

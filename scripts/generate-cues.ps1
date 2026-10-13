@@ -1,4 +1,5 @@
-# Processes the four intentional ElevenLabs source assets already in assets/audio.
+# Processes the four privately supplied ElevenLabs PCM inputs in assets/audio.
+# They are not included in a source checkout and must never enter public Git history.
 # Does not call the paid generation API again. Python standard library only.
 # Source: elevenlabs text-to-sound-effects convert, eleven_text_to_sound_v2,
 # duration-seconds=0.5, prompt-influence=0.7, output-format=pcm_24000, no-retry.
@@ -7,7 +8,13 @@
 # Original .pcm bytes are preserved; no claim of exact original duration/timbre.
 # No private/game/player data was sent. Prompts and measurements are in provenance.json.
 $ErrorActionPreference = 'Stop'
-Push-Location (Join-Path $PSScriptRoot '..')
+$root=Split-Path -Parent $PSScriptRoot
+foreach($cue in @('obstacle','person','object','destination')){
+    if(-not(Test-Path -LiteralPath (Join-Path $root "assets\audio\$cue.pcm"))){
+        throw 'Private PCM inputs are not included in source checkouts. Supply all four licensed inputs before processing.'
+    }
+}
+Push-Location $root
 try {
 @'
 import array, json, math, pathlib, sys, wave
