@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.21)
-project(LISAccess LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.24)
+project(LISAccess LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "LISAccess requires Windows and the MSVC toolchain.")
@@ -7,6 +7,8 @@ endif()
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "LISAccess requires x86. Configure with -A Win32.")
 endif()
+
+add_subdirectory(extern)
 
 function(lis_target target)
     target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
@@ -34,7 +36,9 @@ add_library(lis_input OBJECT src/input/devices.cpp)
 add_library(lis_output OBJECT
     src/output/audio_cues.cpp
     src/output/speech.cpp
+    src/output/prism_bridge.cpp
 )
+target_link_libraries(lis_output PRIVATE prism::prism)
 add_library(lis_features OBJECT
     src/features/camera/facing.cpp
     src/features/interactions/actions.cpp
@@ -83,7 +87,31 @@ lis_test(object_registry_test object_registry tests/object_registry_test.cpp
     src/engine/memory.cpp src/engine/object_registry.cpp)
 lis_test(navigation_description_test navigation_description tests/navigation_description_test.cpp
     src/features/navigation/description.cpp)
+lis_test(speech_test speech_routing tests/speech_test.cpp src/output/speech.cpp
+    src/output/prism_bridge.cpp src/platform/text.cpp)
+target_include_directories(speech_test PRIVATE "${LIS_PRISM_SOURCE_DIR}/include")
+target_compile_definitions(speech_test PRIVATE PRISM_STATIC)
+# Manual smoke test: real desktop/RPC/voice availability is host-dependent and
+# belongs outside CTest. Default probes without speech; --output emits one line.
+add_executable(prism_smoke tests/prism_smoke.cpp src/output/speech.cpp
+    src/output/prism_bridge.cpp src/platform/text.cpp)
+lis_target(prism_smoke)
+target_link_libraries(prism_smoke PRIVATE prism::prism ole32 sapi shell32 uuid user32)
+foreach(target lis_output speech_test prism_smoke)
+    # Match Prism's full-width feature enum; MSVC otherwise truncates its bit 63.
+    target_compile_options(${target} PRIVATE /Zc:enumTypes)
+endforeach()
 find_program(POWERSHELL_EXECUTABLE NAMES powershell REQUIRED)
+add_custom_target(prism_notices ALL
+    COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/stage-prism-notices.ps1"
+        -PrismSource "${LIS_PRISM_SOURCE_DIR}"
+        -OutputDirectory "$<TARGET_FILE_DIR:dinput8>/notices"
+    COMMENT "Stage pinned Prism attribution and license notices"
+    VERBATIM)
+add_dependencies(dinput8 prism_notices)
+add_test(NAME prism_notice_validation COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/notices_test.ps1" -PrismSource "${LIS_PRISM_SOURCE_DIR}")
 add_test(NAME architecture COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File
     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-architecture.ps1")
 add_test(NAME architecture_gate_regression COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File

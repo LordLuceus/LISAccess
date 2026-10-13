@@ -8,7 +8,7 @@ foreach($f in $files){
     $path=[IO.Path]::GetFullPath($f.path)
     # Backward-compatible with the original two-DLL ownership record.
     $game=if($f.gameDirectory){[IO.Path]::GetFullPath($f.gameDirectory)}else{[IO.Path]::GetDirectoryName($path)}
-    $allowed=@('dinput8.dll','nvdaControllerClient32.dll','LISAccess\navigation.ini','LISAccess\audio\obstacle.wav','LISAccess\audio\person.wav','LISAccess\audio\object.wav','LISAccess\audio\destination.wav') | ForEach-Object {[IO.Path]::GetFullPath((Join-Path $game $_))}
+    $allowed=@('dinput8.dll','nvdaControllerClient32.dll','LISAccess\notices\Prism-NOTICES.txt','LISAccess\notices\THIRD-PARTY-LICENSES.md','LISAccess\navigation.ini','LISAccess\audio\obstacle.wav','LISAccess\audio\person.wav','LISAccess\audio\object.wav','LISAccess\audio\destination.wav') | ForEach-Object {[IO.Path]::GetFullPath((Join-Path $game $_))}
     if($path -notin $allowed){throw 'Unexpected manifest path; nothing removed.'}
     if(-not(Test-Path -LiteralPath (Join-Path $game 'LifeIsStrange.exe'))){throw 'Manifest is not in a Life Is Strange binary directory.'}
     if(Test-Path -LiteralPath $path){

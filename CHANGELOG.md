@@ -1,5 +1,22 @@
 # LISAccess changelog
 
+## 2026-10-13 — Prism speech and braille
+
+- Mod announcements now use Prism, including braille through supported screen
+  readers, rather than the speech-only NVDA client. Windows speech fallback is
+  retained, and reader availability is rechecked for each announcement.
+- Braille failures do not repeat already-spoken announcements. Output errors
+  and provider changes are recorded in the mod log.
+- The Windows speech fallback continues to treat announcements as ordinary text,
+  including labels that begin with a less-than sign.
+- Installation no longer requires a separate NVDA controller DLL. Upgrades
+  retire only an unchanged, mod-owned old client and preserve other copies.
+  Third-party notices are installed alongside the mod's settings and sounds.
+
+The output migration does not add dialogue-choice accessibility or change game
+controls. The installed migration has been playtested successfully; this does not
+establish compatibility with every Prism provider or braille-display setup.
+
 ## 2026-10-12 — Interaction scanner and controls (experimental)
 
 - Holding a target-cycle key now repeats without repeated taps.

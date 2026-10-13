@@ -1,5 +1,4 @@
-param([string]$GameDirectory='C:\Program Files (x86)\Steam\steamapps\common\Life Is Strange\Binaries\Win32',
-      [Parameter(Mandatory=$true)][string]$NvdaClient)
+param([string]$GameDirectory='C:\Program Files (x86)\Steam\steamapps\common\Life Is Strange\Binaries\Win32')
 $ErrorActionPreference='Stop'
 if(Get-Process -Name LifeIsStrange -ErrorAction SilentlyContinue){throw 'Close the game before installing.'}
 $root=Split-Path -Parent $PSScriptRoot
@@ -8,7 +7,8 @@ $expected='0973A7E193728088ED438C02DD1F99B490EB35355AD8BE0F2240A3D2690FA233'
 if((Get-FileHash -LiteralPath $exe).Hash -ne $expected){throw 'Unsupported executable. No files changed.'}
 $files=@(
     @{Source=(Join-Path $root 'build-x86\Release\dinput8.dll');Name='dinput8.dll'},
-    @{Source=$NvdaClient;Name='nvdaControllerClient32.dll'},
+    @{Source=(Join-Path $root 'build-x86\Release\notices\Prism-NOTICES.txt');Name='LISAccess\notices\Prism-NOTICES.txt'},
+    @{Source=(Join-Path $root 'build-x86\Release\notices\THIRD-PARTY-LICENSES.md');Name='LISAccess\notices\THIRD-PARTY-LICENSES.md'},
     @{Source=(Join-Path $root 'assets\navigation.ini');Name='LISAccess\navigation.ini';Editable=$true}
 )
 foreach($cue in @('obstacle','person','object','destination')){
@@ -48,4 +48,21 @@ foreach($f in $files){
     ConvertTo-Json -InputObject $manifest | Set-Content -Encoding UTF8 -LiteralPath $temporary
     Move-Item -LiteralPath $temporary -Destination $manifestPath -Force
 }
+# The source-built Prism client replaces the old external controller. Only an
+# exact, unique ownership record authorizes deletion. Changed/unowned clients
+# remain on disk and are not adopted by this installation.
+$legacy=Join-Path $GameDirectory 'nvdaControllerClient32.dll'
+$legacyOwned=@($previous | Where-Object {$_.path -eq $legacy})
+if(Test-Path -LiteralPath $legacy){
+    if($legacyOwned.Count -eq 1 -and (Get-FileHash -LiteralPath $legacy).Hash -eq $legacyOwned[0].sha256){
+        Remove-Item -LiteralPath $legacy
+        Write-Output "Retired unchanged owned legacy client: $legacy"
+    }else{
+        Write-Output "Preserved legacy client (not owned by the Prism installation): $legacy"
+    }
+}
+$manifest=@($manifest | Where-Object {$_.path -ne $legacy})
+$temporary=$manifestPath+'.tmp'
+ConvertTo-Json -InputObject $manifest | Set-Content -Encoding UTF8 -LiteralPath $temporary
+Move-Item -LiteralPath $temporary -Destination $manifestPath -Force
 Write-Output 'Prototype installed. Launch Life Is Strange from Steam, app 319630.'

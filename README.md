@@ -14,8 +14,10 @@ is safe.
 
 ## What it does
 
-- Announces that the mod loaded, using NVDA when available, with Windows
-  SAPI as a fallback.
+- Announces that the mod loaded through Prism, preferring an available screen
+  reader and retaining Windows SAPI as a system-speech fallback.
+- Sends mod announcements to the selected reader's braille channel as well as
+  speech, when that reader supports braille.
 - Reads the game's actual focused title/menu button, rather than estimating
   selection from keypresses.
 - Describes the selected save slot using its displayed name, episode/checkpoint
@@ -28,6 +30,26 @@ This is not complete menu coverage: settings values, account/login pages, all
 confirmation variants and gameplay UI have not been fully tested. Unrecognized or
 unavailable text is not replaced with guessed menu labels. New helper messages are
 currently English; ordinary labels come from the game's displayed text.
+
+## Speech and braille
+
+Prism chooses an available output provider automatically, using its backend
+priorities. NVDA takes priority over JAWS; Windows SAPI remains the preferred
+system-speech provider when priorities are equal. Other Prism providers can also
+be selected when available, but have not all been tested with this mod. Their
+vendor software must be installed separately.
+
+All existing mod announcements go to both speech and the selected reader's
+braille channel when supported. Configure your braille display through your
+screen reader as usual; the mod does not connect to displays directly. SAPI is
+speech-only. A braille-output failure does not cause successful speech to repeat.
+
+Availability is checked again for each announcement, so stopping or restarting
+a reader can switch output without restarting the game. The existing interrupt
+and queue requests are retained. The mod log records provider changes and output
+failures, not the contents of announcements. The migrated output has been
+playtested successfully; other reader and braille-display combinations may still
+need testing.
 
 ## Starting and controls
 
@@ -172,14 +194,26 @@ belong in this configuration or diagnostic tools, never ordinary speech.
 
 ## Reversible installation
 
-The development installation adds `dinput8.dll`, `nvdaControllerClient32.dll`
-and the `LISAccess` settings/audio directory beside the game executable. It does not patch the
+The development installation adds `dinput8.dll` and the `LISAccess`
+settings/audio/notices directory beside the game executable. Prism is built into
+the mod; a separate Prism or NVDA controller DLL is not required. It does not patch the
 executable, cooked assets, Steam app IDs or saves. Normal game actions can still
 create/update saves and settings as usual.
 
 The installer refuses an unsupported executable or an unrelated/changed DLL. Its
 ownership record is `%LOCALAPPDATA%\LISAccess\install.json`. Close the game before
 installing, updating or removing the mod.
+
+After building, install with:
+
+```powershell
+powershell -NoProfile -File scripts/install-prototype.ps1
+```
+
+Upgrading removes the old `nvdaControllerClient32.dll` only when it still matches
+the mod's ownership record. A modified or unowned copy is preserved and reported;
+the new mod does not use it. The build stages the required
+[third-party notices](THIRD-PARTY-LICENSES.md), and installation requires them.
 
 To remove only the recorded, unchanged mod DLLs, run from this repository:
 
@@ -194,12 +228,25 @@ may remain after removal.
 
 ## Development and live inspection
 
-Build with Visual Studio 2022 C++ Build Tools and CMake:
+Build with Visual Studio 2022 C++ Build Tools (including ATL), a Windows SDK with
+MIDL, and CMake 3.24 or newer. Prism requires the compiler's C++23 support; this
+build is verified with MSVC 19.44. The first configure downloads a pinned,
+SHA-256-verified Prism source archive and builds it for **Win32**, not x64:
 
 ```powershell
 powershell -NoProfile -File scripts/build.ps1
 ctest --test-dir build-x86 -C Release --output-on-failure
 ```
+
+For a real 32-bit output-backend readiness check without launching the game:
+
+```powershell
+.\build-x86\Release\prism_smoke.exe
+```
+
+This probes registered providers and SAPI synthesis into memory without audible
+output. Adding `--output` emits one short speech/braille test announcement.
+The deterministic CTest routing fixtures do not require a running screen reader.
 
 The [source architecture guide](docs/ARCHITECTURE.md) describes module ownership,
 threading and validation boundaries, and the automated checks that keep source

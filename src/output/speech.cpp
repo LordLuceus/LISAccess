@@ -1,94 +1,116 @@
 #include "output/speech.h"
+#include "output/prism_bridge.h"
 #include "platform/log.h"
-#include <sapi.h>
+#include "platform/text.h"
+#include <algorithm>
+#include <vector>
 
 namespace lis {
 namespace {
-HMODULE nvda = nullptr;
-using NvdaTest = int(WINAPI*)();
-using NvdaSpeak = int(WINAPI*)(const wchar_t*);
-NvdaTest testNvda = nullptr;
-NvdaTest cancelNvda = nullptr;
-NvdaSpeak speakNvda = nullptr;
-ISpVoice* voice = nullptr;
-bool ownsCom = false;
+namespace bridge=output::bridge;
+struct Backend {
+    PrismBackendId id=PRISM_BACKEND_INVALID;
+    int priority=0;
+    PrismBackend* handle=nullptr;
+    uint64_t features=0;
+    bool ready=false;
+    PrismError speechError=PRISM_OK,brailleError=PRISM_OK;
+};
+PrismContext* context=nullptr;
+std::vector<Backend> backends;
+PrismBackendId active=PRISM_BACKEND_INVALID;
+std::string activeName;
 bool initialized = false;
 DWORD ownerThread = 0;
 
-void EnsureSapi() {
-    if (voice) return;
-    if (!ownsCom) {
-        const HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-        // S_OK and S_FALSE both acquire an apartment reference. A mismatched
-        // pre-existing apartment belongs to somebody else; do not uninitialize it.
-        if (SUCCEEDED(hr)) ownsCom = true;
-        else if (hr != RPC_E_CHANGED_MODE) return;
+void Release(Backend& backend) {
+    if(backend.handle)bridge::Free(backend.handle);
+    backend.handle=nullptr;backend.ready=false;backend.features=0;
+}
+bool Ready(Backend& backend) {
+    if(!backend.handle)backend.handle=bridge::Acquire(context,backend.id);
+    if(!backend.handle)return false;
+    backend.features=bridge::Features(backend.handle);
+    constexpr uint64_t required=PRISM_BACKEND_IS_SUPPORTED_AT_RUNTIME|PRISM_BACKEND_SUPPORTS_SPEAK;
+    if((backend.features&required)!=required) {
+        // Discard old RPC bindings on reader exit, so a restart gets a fresh one.
+        Release(backend);return false;
     }
-    const HRESULT hr = CoCreateInstance(CLSID_SpVoice, nullptr, CLSCTX_INPROC_SERVER,
-                                        IID_ISpVoice, reinterpret_cast<void**>(&voice));
-    Log(SUCCEEDED(hr) ? "event=speech_backend backend=sapi status=ready"
-                      : "event=speech_backend backend=sapi status=unavailable");
+    if(!backend.ready) {
+        const auto result=bridge::Initialize(backend.handle);
+        if(result!=PRISM_OK && result!=PRISM_ERROR_ALREADY_INITIALIZED){Release(backend);return false;}
+        backend.ready=true;
+    }
+    return true;
+}
+void Selected(Backend& backend) {
+    if(active==backend.id)return;
+    active=backend.id;
+    const char* name=bridge::Name(backend.handle);
+    activeName=name?name:"unknown";
+    Log("event=speech_backend provider=prism backend="+activeName+" status=ready braille="+
+        std::to_string((backend.features&PRISM_BACKEND_SUPPORTS_BRAILLE)!=0));
+}
+void Report(Backend& backend,const char* channel,PrismError result,PrismError& last) {
+    if(result!=PRISM_OK && result!=last) {
+        const char* name=bridge::Name(backend.handle);
+        Log(std::string("event=")+channel+"_failed provider=prism backend="+(name?name:"unknown")+
+            " code="+std::to_string(static_cast<int>(result)));
+    }
+    last=result;
 }
 }
-void InitializeSpeech(HMODULE module) {
+void InitializeSpeech(HMODULE) {
     if (initialized) return;
     initialized = true;
     ownerThread = GetCurrentThreadId();
-    wchar_t path[32768]{};
-    const DWORD count = GetModuleFileNameW(module, path, ARRAYSIZE(path));
-    if (count && count < ARRAYSIZE(path)) {
-        const std::wstring full(path, count);
-        const auto separator = full.find_last_of(L"\\/");
-        if (separator != std::wstring::npos) {
-            const auto client = full.substr(0, separator + 1) + L"nvdaControllerClient32.dll";
-            nvda = LoadLibraryExW(client.c_str(), nullptr,
-                                 LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
-        }
+    context=bridge::Init();
+    if(!context){Log("event=speech_failed provider=prism reason=initialization");return;}
+    const size_t count=bridge::Count(context);
+    for(size_t i=0;i<count && i<64;++i) {
+        const auto id=bridge::Id(context,i);
+        if(id!=PRISM_BACKEND_INVALID)backends.push_back({id,bridge::Priority(context,id)});
     }
-    if (nvda) {
-        testNvda = reinterpret_cast<NvdaTest>(GetProcAddress(nvda, "nvdaController_testIfRunning"));
-        speakNvda = reinterpret_cast<NvdaSpeak>(GetProcAddress(nvda, "nvdaController_speakText"));
-        cancelNvda = reinterpret_cast<NvdaTest>(GetProcAddress(nvda, "nvdaController_cancelSpeech"));
-        if (!testNvda || !speakNvda || !cancelNvda) {
-            FreeLibrary(nvda);
-            nvda = nullptr;
-            testNvda = nullptr;
-            speakNvda = nullptr;
-            cancelNvda = nullptr;
-        }
-    }
-    if (testNvda && testNvda() == 0) Log("event=speech_backend backend=nvda status=ready");
-    else EnsureSapi();
+    std::stable_sort(backends.begin(),backends.end(),[](const auto& a,const auto& b) {
+        if(a.priority!=b.priority)return a.priority>b.priority;
+        // Preserve SAPI as the preferred system-TTS fallback in a priority tie.
+        return a.id==PRISM_BACKEND_SAPI && b.id!=PRISM_BACKEND_SAPI;
+    });
+    for(auto& backend:backends)if(Ready(backend)){Selected(backend);return;}
+    Log("event=speech_failed provider=prism reason=no_available_backend");
 }
 void Speak(const std::wstring& text, bool interrupt) {
     if (!initialized || ownerThread != GetCurrentThreadId() || text.empty()) return;
-    if (testNvda && testNvda() == 0) {
-        if (interrupt) {
-            if (voice) voice->Speak(nullptr, SPF_ASYNC | SPF_PURGEBEFORESPEAK, nullptr);
-            cancelNvda();
+    if(!context)return;
+    const std::string utf8=Utf8(text);
+    if(utf8.empty())return;
+    for(auto& backend:backends) {
+        if(!Ready(backend))continue;
+        if(interrupt && active!=backend.id) {
+            for(auto& previous:backends)
+                if(previous.id==active && previous.ready && previous.handle)bridge::Stop(previous.handle);
         }
-        if (speakNvda(text.c_str()) == 0) return;
+        // Separate results are essential: output() can report a braille failure
+        // AFTER successfully speaking. Retrying that result would speak twice.
+        const auto speech=bridge::Speak(backend.handle,utf8.c_str(),interrupt);
+        Report(backend,"speech",speech,backend.speechError);
+        if(backend.features&PRISM_BACKEND_SUPPORTS_BRAILLE) {
+            const auto braille=bridge::Braille(backend.handle,utf8.c_str());
+            Report(backend,"braille",braille,backend.brailleError);
+        }
+        if(speech==PRISM_OK){Selected(backend);return;}
+        Release(backend);
     }
-    EnsureSapi();
-    if (voice) {
-        const DWORD flags = SPF_ASYNC | SPF_IS_NOT_XML | (interrupt ? SPF_PURGEBEFORESPEAK : 0);
-        if (FAILED(voice->Speak(text.c_str(), flags, nullptr))) Log("event=speech_failed backend=sapi");
-    }
+    active=PRISM_BACKEND_INVALID;activeName.clear();
+    Log("event=speech_failed provider=prism reason=all_backends_failed");
 }
+const char* SpeechBackendName() {return ownerThread==GetCurrentThreadId()?activeName.c_str():"";}
 void ShutdownSpeech() {
     if (!initialized || ownerThread != GetCurrentThreadId()) return;
-    if (voice) {
-        voice->Speak(nullptr, SPF_ASYNC | SPF_PURGEBEFORESPEAK, nullptr);
-        voice->Release();
-        voice = nullptr;
-    }
-    if (nvda) FreeLibrary(nvda);
-    nvda = nullptr;
-    testNvda = nullptr;
-    cancelNvda = nullptr;
-    speakNvda = nullptr;
-    if (ownsCom) CoUninitialize();
-    ownsCom = false;
+    for(auto& backend:backends){if(backend.ready && backend.handle)bridge::Stop(backend.handle);Release(backend);}
+    backends.clear();active=PRISM_BACKEND_INVALID;activeName.clear();
+    if(context)bridge::Shutdown(context);
+    context=nullptr;
     initialized = false;
     ownerThread = 0;
 }

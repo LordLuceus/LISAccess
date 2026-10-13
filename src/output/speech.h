@@ -6,4 +6,6 @@ namespace lis {
 void InitializeSpeech(HMODULE module);
 void Speak(const std::wstring& text, bool interrupt = true);
 void ShutdownSpeech();
+// Diagnostic readback on the owning output thread; no game state is queried.
+const char* SpeechBackendName();
 }

@@ -1,9 +1,8 @@
 # LISAccess source architecture
 
-This is a structural separation of the existing mod, not a new gameplay or output
-backend. Native offsets, validation, controls, speech wording and settings retain
-their previous behaviour. Speech still uses NVDA with SAPI fallback; Prism and
-braille are a separate change.
+Native offsets, validation, controls and announcement wording are independent
+of the output backend. Speech and braille now use a pinned, source-built x86
+Prism library; the migration does not add gameplay features or dialogue choices.
 
 ## Modules and ownership
 
@@ -26,6 +25,16 @@ braille are a separate change.
 CMake lists each module's sources explicitly and compiles the reusable modules as
 object-library targets. The final `dinput8` DLL contains those modules; this does
 not add runtime DLLs or change installation layout.
+
+Prism is configured separately in `extern/`. Its whole-archive interface retains
+backend registrations; the raw static archive alone is insufficient. The output
+adapter checks runtime availability rather than trusting a cached best backend.
+Speech and braille use separate return values, so a failed braille operation
+cannot replay speech. The native bridge catches reader/RPC exceptions outside
+frames containing C++ objects. Backends are freed before their context; all of
+that lifetime stays on the output worker. The backend decision is generic, not
+a list limited to NVDA and JAWS. A reproducible SAPI compatibility patch preserves
+literal text; the upstream snapshot stays pristine for notice verification.
 
 ## Important boundaries
 
@@ -93,7 +102,9 @@ ctest --test-dir build-x86 -C Release --output-on-failure
 ```
 
 CTest includes the original narration, geometry, ABI, input and reflected-field
-tests, plus object-registry policy and extracted narration fixtures. It also runs
+tests, plus object-registry policy and extracted narration fixtures. Speech/braille
+routing uses fake providers to cover native RPC faults and reader restarts without
+producing speech or requiring a reader. CTest also runs
 the architecture gate and a separate test that deliberately injects oversized
 files, forbidden dependencies and loose source placement to prove rejection.
 
