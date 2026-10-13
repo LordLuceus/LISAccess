@@ -1,4 +1,4 @@
-#include "input_commands.h"
+#include "input/commands.h"
 #include <iostream>
 #include <algorithm>
 using namespace lis::input;

@@ -201,6 +201,10 @@ powershell -NoProfile -File scripts/build.ps1
 ctest --test-dir build-x86 -C Release --output-on-failure
 ```
 
+The [source architecture guide](docs/ARCHITECTURE.md) describes module ownership,
+threading and validation boundaries, and the automated checks that keep source
+files and dependencies manageable.
+
 Menu inspection runs read-only GFx queries on the game's window/game thread.
 `tools/probe_runtime.py` requests a number, string or a known menu object's
 `GetText` result through local request/response files. It does not provide arbitrary

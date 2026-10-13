@@ -31,10 +31,6 @@ struct Snapshot {
 // All entry points must run on the same game/window thread, after runtime build verification.
 // First Sample binds that thread; Reset does not permit rebinding. No worker calls.
 void SetLandmarks(const std::vector<Landmark>& landmarks);
-// Revalidates focus and visible native actions on the game thread. Empty result
-// means the request was delivered, not that every scripted consequence completed.
-std::wstring ActivateFocused(const std::string& expectedFocus,unsigned slot);
-std::wstring FaceTarget(const std::string& expectedTarget,bool& submitted);
 bool Sample(Snapshot& snapshot); // true only for an active, calibrated sample
 void Reset();
 }

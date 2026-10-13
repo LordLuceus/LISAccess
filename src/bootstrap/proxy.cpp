@@ -1,4 +1,6 @@
-#include "platform.h"
+#include "bootstrap/runtime.h"
+#include "bootstrap/platform_lifecycle.h"
+#include "platform/log.h"
 #include <objbase.h>
 
 namespace {
@@ -16,12 +18,10 @@ BOOL CALLBACK LoadReal(PINIT_ONCE, PVOID, PVOID*) {
     realModule = LoadLibraryExW(path.c_str(), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
     return TRUE; // A missing system library is a permanent failure, never search elsewhere.
 }
-
 FARPROC Resolve(const char* name) {
     InitOnceExecuteOnce(&realOnce, LoadReal, nullptr, nullptr);
     return realModule ? GetProcAddress(realModule, name) : nullptr;
 }
-
 DWORD WINAPI Worker(void* context) {
     // Thread entry is serialized behind DLL_PROCESS_ATTACH by the OS. Pin here,
     // outside the loader lock: the prototype is process-lifetime, not hot-unloadable.
@@ -38,7 +38,6 @@ DWORD WINAPI Worker(void* context) {
     return 0;
 }
 }
-
 extern "C" HRESULT WINAPI ProxyDirectInput8Create(HINSTANCE instance, DWORD version,
                                                   REFIID iid, LPVOID* output, LPUNKNOWN outer) {
     const auto fn = reinterpret_cast<CreateFn>(Resolve("DirectInput8Create"));
@@ -66,7 +65,6 @@ extern "C" const void* WINAPI ProxyGetdfDIJoystick() {
     const auto fn = reinterpret_cast<const void*(WINAPI*)()>(Resolve("GetdfDIJoystick"));
     return fn ? fn() : nullptr;
 }
-
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         // Do not disable thread callbacks with the static CRT. No COM, speech,

@@ -5,8 +5,8 @@
 #undef _WIN32_WINNT
 #define _WIN32_WINNT 0x0A00
 #endif
-#include "audio_cues.h"
-#include "platform.h"
+#include "output/audio_cues.h"
+#include "platform/log.h"
 #include <xaudio2.h>
 #include <algorithm>
 #include <array>

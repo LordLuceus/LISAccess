@@ -1,0 +1,4 @@
+# Keep source diffs consistent across Windows editors and refactoring tools.
+*.cpp text eol=lf
+*.h text eol=lf
+*.def text eol=lf

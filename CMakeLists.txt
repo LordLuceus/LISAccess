@@ -8,52 +8,83 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "LISAccess requires x86. Configure with -A Win32.")
 endif()
 
-add_library(dinput8 SHARED
-    src/proxy.cpp
-    src/platform.cpp
-    src/runtime.cpp
-    src/audio_cues.cpp
-    src/navigation.cpp
-    src/world_probe.cpp
-    src/dinput8.def
+function(lis_target target)
+    target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+    target_compile_features(${target} PRIVATE cxx_std_17)
+    target_compile_definitions(${target} PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_compile_options(${target} PRIVATE /W4 /permissive- /utf-8 /EHsc)
+    set_property(TARGET ${target} PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endfunction()
+
+# Explicit module source lists: a new file must have an intentional home.
+add_library(lis_platform OBJECT
+    src/platform/foreground.cpp
+    src/platform/log.cpp
+    src/platform/text.cpp
 )
-target_compile_features(dinput8 PRIVATE cxx_std_17)
-target_compile_definitions(dinput8 PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_compile_options(dinput8 PRIVATE /W4 /permissive- /utf-8 /EHsc)
-# This is a system-DLL proxy, not a COM client import library. Preserve the
-# system export ordinals; making COM exports PRIVATE triggers incompatible advice.
+add_library(lis_engine OBJECT
+    src/engine/build_verification.cpp
+    src/engine/gfx.cpp
+    src/engine/localization.cpp
+    src/engine/memory.cpp
+    src/engine/object_registry.cpp
+    src/engine/reflection.cpp
+)
+add_library(lis_input OBJECT src/input/devices.cpp)
+add_library(lis_output OBJECT
+    src/output/audio_cues.cpp
+    src/output/speech.cpp
+)
+add_library(lis_features OBJECT
+    src/features/camera/facing.cpp
+    src/features/interactions/actions.cpp
+    src/features/interactions/scanner.cpp
+    src/features/menus/diagnostics.cpp
+    src/features/menus/menus.cpp
+    src/features/navigation/collision.cpp
+    src/features/navigation/description.cpp
+    src/features/navigation/navigation.cpp
+    src/features/navigation/world_sample.cpp
+    src/features/world/discovery.cpp
+    src/features/world/player.cpp
+    src/features/world/world.cpp
+)
+foreach(module lis_platform lis_engine lis_input lis_output lis_features)
+    lis_target(${module})
+endforeach()
+
+add_library(dinput8 SHARED
+    src/bootstrap/platform_lifecycle.cpp
+    src/bootstrap/proxy.cpp
+    src/bootstrap/runtime.cpp
+    src/bootstrap/dinput8.def
+)
+lis_target(dinput8)
+# A system-DLL proxy, not a COM import library: preserve system export ordinals.
 target_link_options(dinput8 PRIVATE /IGNORE:4104)
-set_property(TARGET dinput8 PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-target_link_libraries(dinput8 PRIVATE ole32 sapi shell32 uuid user32 bcrypt)
+target_link_libraries(dinput8 PRIVATE
+    lis_platform lis_engine lis_input lis_output lis_features
+    ole32 sapi shell32 uuid user32 bcrypt
+)
 set_target_properties(dinput8 PROPERTIES PREFIX "" OUTPUT_NAME "dinput8")
+
 enable_testing()
-add_executable(narration_test tests/narration_test.cpp)
-target_include_directories(narration_test PRIVATE src)
-target_compile_features(narration_test PRIVATE cxx_std_17)
-target_compile_options(narration_test PRIVATE /W4 /utf-8)
-set_property(TARGET narration_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-add_test(NAME narration COMMAND narration_test)
-add_executable(navigation_test tests/navigation_test.cpp)
-target_include_directories(navigation_test PRIVATE src)
-target_compile_features(navigation_test PRIVATE cxx_std_17)
-target_compile_options(navigation_test PRIVATE /W4 /utf-8)
-set_property(TARGET navigation_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-add_test(NAME navigation_geometry COMMAND navigation_test)
-add_executable(native_abi_test tests/native_abi_test.cpp)
-target_include_directories(native_abi_test PRIVATE src)
-target_compile_features(native_abi_test PRIVATE cxx_std_17)
-target_compile_options(native_abi_test PRIVATE /W4 /utf-8)
-set_property(TARGET native_abi_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-add_test(NAME native_dispatch_abi COMMAND native_abi_test)
-add_executable(input_commands_test tests/input_commands_test.cpp)
-target_include_directories(input_commands_test PRIVATE src)
-target_compile_features(input_commands_test PRIVATE cxx_std_17)
-target_compile_options(input_commands_test PRIVATE /W4 /utf-8)
-set_property(TARGET input_commands_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-add_test(NAME input_commands COMMAND input_commands_test)
-add_executable(interaction_fields_test tests/interaction_fields_test.cpp)
-target_include_directories(interaction_fields_test PRIVATE src)
-target_compile_features(interaction_fields_test PRIVATE cxx_std_17)
-target_compile_options(interaction_fields_test PRIVATE /W4 /utf-8)
-set_property(TARGET interaction_fields_test PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-add_test(NAME interaction_fields COMMAND interaction_fields_test)
+function(lis_test target name)
+    add_executable(${target} ${ARGN})
+    lis_target(${target})
+    add_test(NAME ${name} COMMAND ${target})
+endfunction()
+lis_test(narration_test narration tests/narration_test.cpp)
+lis_test(navigation_test navigation_geometry tests/navigation_test.cpp)
+lis_test(native_abi_test native_dispatch_abi tests/native_abi_test.cpp)
+lis_test(input_commands_test input_commands tests/input_commands_test.cpp)
+lis_test(interaction_fields_test interaction_fields tests/interaction_fields_test.cpp)
+lis_test(object_registry_test object_registry tests/object_registry_test.cpp
+    src/engine/memory.cpp src/engine/object_registry.cpp)
+lis_test(navigation_description_test navigation_description tests/navigation_description_test.cpp
+    src/features/navigation/description.cpp)
+find_program(POWERSHELL_EXECUTABLE NAMES powershell REQUIRED)
+add_test(NAME architecture COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File
+    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-architecture.ps1")
+add_test(NAME architecture_gate_regression COMMAND "${POWERSHELL_EXECUTABLE}" -NoProfile -File
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/architecture_test.ps1")

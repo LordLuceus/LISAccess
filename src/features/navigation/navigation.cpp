@@ -1,18 +1,22 @@
-#include "navigation.h"
-#include "navigation_math.h"
-#include "world_probe.h"
-#include "audio_cues.h"
-#include "platform.h"
-#include "input_commands.h"
+#include "features/navigation/navigation.h"
+#include "features/navigation/math.h"
+#include "features/navigation/description.h"
+#include "features/world/world.h"
+#include "features/interactions/actions.h"
+#include "features/camera/facing.h"
+#include "output/audio_cues.h"
+#include "output/speech.h"
+#include "platform/log.h"
+#include "input/devices.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <mutex>
 #include <string>
 #include <vector>
-#include <Xinput.h>
 
 namespace lis::navigation {
+using namespace detail;
 namespace {
 std::mutex mutex;
 world::Snapshot latest;
@@ -24,16 +28,7 @@ bool warnedInteractions=false;
 int preview = -1;
 ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, previewUntil = 0, logAt = 0;
 std::string selected;
-std::wstring FocusText(const world::Snapshot& s);
-std::wstring ActionText(const world::Snapshot& s);
-input::Keyboard keyboard;
-input::Controller controllerInput;
-HMODULE xinputModule=nullptr;
-using GetPadState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
-GetPadState getPadState=nullptr;
-int padIndex=0;
-int previousPadIndex=-1;
-bool padWasConnected=false;
+input::Devices devices;
 int pendingAction=-1;
 std::string pendingFocus,pendingFace,seenFocus,spokenFocus;
 std::string aimingAt,faceReply;
@@ -47,58 +42,9 @@ std::string Utf8(const std::wstring& text) {
     if(n) WideCharToMultiByte(CP_UTF8,0,text.data(),static_cast<int>(text.size()),s.data(),n,nullptr,nullptr);
     return s;
 }
-float Distance(const world::Snapshot& s, const world::Target& t) {
-    return std::hypot(t.position.x-s.player.x,t.position.y-s.player.y);
-}
-float Bearing(const world::Snapshot& s, const world::Target& t) {
-    return navmath::Bearing(t.position.x-s.player.x,t.position.y-s.player.y,s.cameraYaw);
-}
-std::wstring Describe(const world::Snapshot& s, const world::Target& t) {
-    const float distance=Distance(s,t);
-    std::wstring text=t.label+L", "+navmath::Direction(Bearing(s,t))+L", "+navmath::Distance(distance,s.radius);
-    if(t.position.z-s.player.z > s.halfHeight*2) text+=L", above";
-    else if(s.player.z-t.position.z > s.halfHeight*2) text+=L", below";
-    if(t.kind!=world::Kind::Destination) {
-        if(t.stableId==s.focusedId){text+=L". Focused";const auto actions=ActionText(s);if(!actions.empty())text+=L". "+actions;}
-        else text+=L". Not focused. Face this target before choosing an action.";
-        if(t.angleRestricted)text+=L" Try facing or approaching it from another direction.";
-    }
-    return text;
-}
-audio::Cue CueFor(world::Kind kind) {
-    if(kind==world::Kind::Person) return audio::Cue::Person;
-    if(kind==world::Kind::Destination) return audio::Cue::Destination;
-    return audio::Cue::Object;
-}
-const wchar_t* PreviewName(int i) {
-    const wchar_t* names[]={L"Obstacle",L"Person",L"Object",L"Destination"};
-    return names[i];
-}
-std::wstring ActionText(const world::Snapshot& s) {
-    std::wstring text;
-    static const wchar_t* pad[]={L"Y",L"X",L"B",L"A"};
-    for(size_t i=0;i<s.actions.size();++i)if(!s.actions[i].label.empty()) {
-        if(!text.empty())text+=L". ";
-        std::wstring label=s.actions[i].label;
-        while(!label.empty()&&(label.back()==L'.'||label.back()==L' '))label.pop_back();
-        text+=label+L", "+(s.gamepad ? std::wstring(pad[i]) : std::to_wstring(i+1));
-    }
-    return text;
-}
-std::wstring FocusText(const world::Snapshot& s) {
-    std::wstring text=s.focusedLabel;const auto actions=ActionText(s);
-    if(!actions.empty()){if(!text.empty())text+=text.back()==L'.'?L" ":L". ";text+=actions;}
-    return text;
-}
 }
 void Initialize(HMODULE module) {
-    for(const wchar_t* library:{L"xinput1_4.dll",L"xinput1_3.dll",L"xinput9_1_0.dll"}) {
-        xinputModule=LoadLibraryExW(library,nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-        if(!xinputModule)continue;
-        getPadState=reinterpret_cast<GetPadState>(GetProcAddress(xinputModule,"XInputGetState"));
-        if(getPadState)break;
-        FreeLibrary(xinputModule);xinputModule=nullptr;
-    }
+    devices.Initialize();
     wchar_t path[32768]{}; GetModuleFileNameW(module,path,ARRAYSIZE(path));
     const auto ini=std::filesystem::path(path).parent_path()/L"LISAccess"/L"navigation.ini";
     obstacles=GetPrivateProfileIntW(L"Navigation",L"ObstacleCues",0,ini.c_str())!=0;
@@ -141,10 +87,7 @@ void Tick() {
 }
 void Pump(bool foreground, bool readableMenu) {
     const auto now=GetTickCount64();
-    input::Presses raw{};
-    for(size_t i=0;i<input::Count;++i)raw[i]=(GetAsyncKeyState(input::Keys[i])&0x8000)!=0;
-    const input::Modifiers modifiers{(GetAsyncKeyState(VK_SHIFT)&0x8000)!=0,(GetAsyncKeyState(VK_CONTROL)&0x8000)!=0,(GetAsyncKeyState(VK_MENU)&0x8000)!=0};
-    auto pressed=keyboard.Update(raw,modifiers,foreground,now);
+    auto pressed=devices.ReadKeyboard(foreground,now);
     world::Snapshot s;ULONGLONG at=0;
     std::wstring reply;std::string completedFace;bool submitted=false;
     {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;reply.swap(feedback);completedFace.swap(faceReply);submitted=faceSubmitted;}
@@ -152,12 +95,7 @@ void Pump(bool foreground, bool readableMenu) {
     if(foreground&&!reply.empty())Speak(reply);
     const bool fresh=at && now-at<=450;
     const bool active=foreground && fresh && s.active && !s.interactionBusy && !readableMenu;
-    if(s.controllerIndex>=0&&s.controllerIndex<4)padIndex=s.controllerIndex;
-    XINPUT_STATE pad{};
-    const bool connected=getPadState&&getPadState(static_cast<DWORD>(padIndex),&pad)==ERROR_SUCCESS;
-    if(connected&&(!padWasConnected||previousPadIndex!=padIndex))controllerInput.Update(pad.Gamepad.wButtons,false,now);
-    const auto padPresses=controllerInput.Update(connected?pad.Gamepad.wButtons:0,active&&connected,now);
-    padWasConnected=connected;previousPadIndex=padIndex;
+    const auto padPresses=devices.ReadController(s.controllerIndex,active,now);
     if(std::any_of(padPresses.begin(),padPresses.end(),[](bool value){return value;}))s.gamepad=true;
     else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;}))s.gamepad=false;
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
@@ -275,5 +213,5 @@ void Pump(bool foreground, bool readableMenu) {
         nextBeacon=now+navmath::Interval(Distance(s,*current),s.radius*50);
     }
 }
-void Shutdown() {audio::Shutdown();if(xinputModule){FreeLibrary(xinputModule);xinputModule=nullptr;getPadState=nullptr;}}
+void Shutdown() {audio::Shutdown();devices.Shutdown();}
 }
