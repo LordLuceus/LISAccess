@@ -18,9 +18,9 @@ Prism library; the migration does not add gameplay features or dialogue choices.
   commands rather than executing game actions or producing speech.
 - **`output/`** owns speech-backend lifetime and audio-cue playback. Backend changes
   belong here, not in individual menus or scanner features.
-- **`features/`** owns player-facing decisions. Menus, prompts, world sampling,
-  navigation, interaction scanning/actions and explicit camera facing have their own files.
-  A future dialogue feature belongs here, not in the bootstrap worker.
+- **`features/`** owns player-facing decisions. Menus, prompts, dialogue, world
+  sampling, navigation, interaction scanning/actions and explicit camera facing
+  have their own files.
 
 CMake lists each module's sources explicitly and compiles the reusable modules as
 object-library targets. The final `dinput8` DLL contains those modules; this does
@@ -40,7 +40,7 @@ literal text; the upstream snapshot stays pristine for notice verification.
 
 ### Game-thread access versus worker output
 
-Menu/prompt snapshots, world queries, interaction activation and camera requests retain
+Menu/prompt/dialogue snapshots, world queries, explicit choice/interaction activation and camera requests retain
 their game/window-thread execution. The worker polls input, narrates copied
 snapshots and plays sounds. Requests cross the existing locked handoff and are
 revalidated on the game thread; moving files is not permission to call native
@@ -54,6 +54,27 @@ The reflection cache and input-device owner are noncopyable. Scanner reader
 adapters borrow the cache rather than copying its property table for every target.
 
 ### Validation and lifetime are behaviour
+
+Dialogue reuses the world's reflected metadata cache, not its traversal or physics
+gate. It reads the current actor's filtered UI arguments and sparse binding map,
+then localizes those offered keys through the game's existing localization path.
+It never enumerates all stored possible answers. Its native reader has a separate
+fault boundary. Pause/menu/widget flags, a verified player/actor relationship and
+normal rewind state gate availability; actor/node/page, rewind sequence and
+bindings identify the request's exact context. Number-key requests expire after
+450 ms and are re-read on the game thread immediately before the verified input
+listener receives a choice. Native controller buttons are not synthesized.
+
+The policy tests pin the captured Jefferson question and sparse map, including its
+empty Y/A slots, and check changed/hidden/unreadable choices. These tests do not
+prove the full live native path: timed questions, rewind, transitions and action
+delivery beyond the accepted initial playtest still require verification.
+Detailed dialogue diagnostics default off after that acceptance.
+
+Dialogue uses `WhatIfInput.bPlayingWithGamepad`, as object actions do, to announce
+only the appropriate device's bindings. The current repeat/help command can
+override an older native sample immediately. Device mode affects presentation,
+not choice identity or activation authority.
 
 The menu and world readers previously used different registry bounds. Their
 implementations now share `engine/object_registry`, but explicit `Menu` and

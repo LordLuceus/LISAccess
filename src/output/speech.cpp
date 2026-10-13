@@ -22,6 +22,7 @@ PrismBackendId active=PRISM_BACKEND_INVALID;
 std::string activeName;
 bool initialized = false;
 DWORD ownerThread = 0;
+uint64_t serial=0;
 
 void Release(Backend& backend) {
     if(backend.handle)bridge::Free(backend.handle);
@@ -81,6 +82,7 @@ void InitializeSpeech(HMODULE) {
 }
 void Speak(const std::wstring& text, bool interrupt) {
     if (!initialized || ownerThread != GetCurrentThreadId() || text.empty()) return;
+    ++serial;
     if(!context)return;
     const std::string utf8=Utf8(text);
     if(utf8.empty())return;
@@ -105,6 +107,12 @@ void Speak(const std::wstring& text, bool interrupt) {
     Log("event=speech_failed provider=prism reason=all_backends_failed");
 }
 const char* SpeechBackendName() {return ownerThread==GetCurrentThreadId()?activeName.c_str():"";}
+uint64_t SpeechSerial() {return ownerThread==GetCurrentThreadId()?serial:0;}
+void StopSpeechIfCurrent(uint64_t expected) {
+    if(!initialized||ownerThread!=GetCurrentThreadId()||!expected||expected!=serial)return;
+    for(auto& backend:backends)if(backend.id==active&&backend.ready&&backend.handle)bridge::Stop(backend.handle);
+    ++serial; // an old token cannot cancel a later output lifetime
+}
 void ShutdownSpeech() {
     if (!initialized || ownerThread != GetCurrentThreadId()) return;
     for(auto& backend:backends){if(backend.ready && backend.handle)bridge::Stop(backend.handle);Release(backend);}

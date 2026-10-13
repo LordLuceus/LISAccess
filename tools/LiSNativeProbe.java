@@ -1,5 +1,6 @@
 // Targeted static research only. Used with -noanalysis -readOnly -deleteProject.
-// Addresses come from this build's native registration table, not a guessed SDK.
+// Addresses must come from this build's registration table or verified live
+// vtables, not a guessed SDK. Caller labels are research names, not debug symbols.
 // @category LISAccess.Research
 import ghidra.app.script.GhidraScript;
 import ghidra.app.decompiler.DecompInterface;
@@ -18,7 +19,7 @@ public class LiSNativeProbe extends GhidraScript {
         DecompInterface decompiler = new DecompInterface();
         try (PrintWriter output = new PrintWriter(Files.newBufferedWriter(Path.of(args[0]), StandardCharsets.UTF_8))) {
             if (!decompiler.openProgram(currentProgram)) throw new IllegalStateException(decompiler.getLastMessage());
-            output.println("Static, targeted decompilation. Research labels are derived from registration strings.");
+            output.println("Static, targeted decompilation. Caller-supplied evidence-bound addresses and research labels; not debug symbols.");
             output.println("Executable: " + currentProgram.getExecutablePath());
             for (int i = 1; i < args.length; i++) {
                 monitor.checkCancelled();

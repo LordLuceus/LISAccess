@@ -6,6 +6,7 @@
 #include "features/menus/diagnostics.h"
 #include "features/navigation/navigation.h"
 #include "features/prompts/prompts.h"
+#include "features/dialogue/dialogue.h"
 #include "platform/foreground.h"
 #include "platform/log.h"
 #include "output/speech.h"
@@ -24,6 +25,7 @@ std::wstring localDirectory;
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
     prompts::Tick();
     navigation::Tick();
+    dialogue::Tick();
     if (!failed && !menus::SafeSnapshot()) { failed = true; Log("event=bridge_fault status=disabled"); }
 }
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
@@ -84,6 +86,7 @@ void RunRuntime(HMODULE module) {
         std::wstring speech = menus::ConsumeSpeech(foreground, wasForeground, readableMenu,interrupt);
         if (!speech.empty() && foreground) Speak(speech,interrupt);
         navigation::Pump(foreground, readableMenu);
+        dialogue::Pump(foreground, readableMenu);
         prompts::Pump(foreground,readableMenu);
         wasForeground = foreground;
         Sleep(25);

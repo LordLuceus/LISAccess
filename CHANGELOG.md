@@ -1,5 +1,24 @@
 # LISAccess changelog
 
+## 2026-10-13 — Dialogue choices
+
+- Added automatic reading of the answers actually offered, with keyboard numbers
+  or controller face buttons according to the active input mode, rather than both.
+  Repeat and help use the appropriate device's commands. Empty slots are not renumbered.
+- Number-row 1–4 select the corresponding offered answer through the game's own
+  dialogue controls. Choices are checked again before activation; hidden or
+  changed answers and stale requests are refused.
+- Ctrl+Home or left-stick click plus D-pad right repeats the current choices.
+  F1 or left-stick click plus D-pad up reads dialogue help. R remains rewind.
+- Timed choices are identified, but their deadlines are not paused or extended.
+- Obsolete choice readouts stop when choices close, provided no newer mod
+  announcement has taken over.
+
+The classroom question supplied the read-only fixture, and the initial dialogue
+build passed its playtest. Later questions, timed choices and rewind transitions
+have not been comprehensively verified.
+This does not add spoken subtitles or repeat the characters' voiced dialogue.
+
 ## 2026-10-13 — Tutorials and startup messages
 
 - Added narration for tutorial/HUD text announcements and composed startup

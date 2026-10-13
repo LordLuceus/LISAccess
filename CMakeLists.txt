@@ -40,6 +40,8 @@ add_library(lis_output OBJECT
 )
 target_link_libraries(lis_output PRIVATE prism::prism)
 add_library(lis_features OBJECT
+    src/features/dialogue/dialogue.cpp
+    src/features/dialogue/native.cpp
     src/features/camera/facing.cpp
     src/features/interactions/actions.cpp
     src/features/interactions/scanner.cpp
@@ -82,6 +84,8 @@ endfunction()
 lis_test(narration_test narration tests/narration_test.cpp)
 lis_test(popup_test startup_popup tests/popup_test.cpp)
 lis_test(prompts_test prompt_policy tests/prompts_test.cpp)
+lis_test(dialogue_test dialogue_policy tests/dialogue_test.cpp)
+lis_test(dialogue_lifecycle_test dialogue_lifecycle tests/dialogue_lifecycle_test.cpp src/features/dialogue/dialogue.cpp)
 lis_test(navigation_test navigation_geometry tests/navigation_test.cpp)
 lis_test(native_abi_test native_dispatch_abi tests/native_abi_test.cpp)
 lis_test(input_commands_test input_commands tests/input_commands_test.cpp)

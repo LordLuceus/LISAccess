@@ -8,7 +8,8 @@ An **experimental opening-navigation layer** has been used successfully to reach
 the lighthouse and enter the next scene. Cue balance at normal game volume still
 needs listening feedback. The corrected scanner and interactions have been
 playtested through the classroom selfie, including automatic target announcements
-while aiming with the right stick. Dialogue-choice accessibility is the next gap.
+while aiming with the right stick. Dialogue-choice narration and selection have
+also passed their initial playtest.
 This is not complete gameplay accessibility, and silence never means that an area
 is safe.
 
@@ -35,6 +36,8 @@ reuse rights to the sounds.
 - Reads visible tutorial prompts, HUD notices and composed startup popups such
   as the autosave explanation. The narrated photo, selfie and general interaction
   tutorials describe the mod's scanner/action controls instead of mouse dragging.
+- Announces the currently offered dialogue choices and their keyboard/controller
+  buttons. It never selects an answer automatically.
 - Reads the game's actual focused title/menu button, rather than estimating
   selection from keypresses.
 - Describes the selected save slot using its displayed name, episode/checkpoint
@@ -76,6 +79,7 @@ actual composed text rather than a fixed English substitute. Startup readouts
 queue so the next slide or automatic title message does not cut them short;
 explicit reread and subsequent menu navigation still interrupt. During
 gameplay, **Ctrl+Home** repeats the latest captured prompt, even after it fades.
+During dialogue it repeats the currently available choices instead.
 On a controller, hold the left-stick click and press **D-pad right**. These repeat
 commands do not select or dismiss a prompt. **R remains rewind in gameplay**;
 in readable menus and startup popups, R repeats the current readout as before.
@@ -89,9 +93,41 @@ or repeat commands can interrupt them.
 
 This reader covers the inspected tooltip, quote, HUD-prompt, notification and
 animated-tutorial captions, plus composed menu popups and startup slides—not text
-baked into videos or images. It does not add subtitles or dialogue-choice support,
+baked into videos or images. This prompt reader does not add subtitles,
 nor announcements for the autosave icon itself. Startup narration and the photo
 and selfie tutorials have been playtested successfully.
+
+## Dialogue choices
+
+When choices appear or change, their labels are read with keyboard numbers or
+controller face buttons, according to the game's active input mode—the same
+detection used for object actions. Repeat and help follow the device you use;
+you do not need to hear both sets of commands. The mapping stays **1 = Y, 2 = X,
+3 = B, 4 = A**. Missing slots are not renumbered, so a two-answer question may
+offer 2 and 3 rather than 1 and 2. Controller face buttons retain their native
+game behaviour; numbered keyboard choices use the same native dialogue handler.
+
+- **1–4, number row:** select the corresponding offered answer.
+- **Ctrl+Home**, or **hold left-stick click and press D-pad right:** repeat the
+  current choices without selecting anything.
+- **F1**, or **hold left-stick click and press D-pad up** while choices are
+  available: read dialogue help.
+- **R:** remains the game's rewind control, not dialogue repeat.
+
+Choice requests are checked again before activation. Hidden, unavailable or
+changed choices are not selected, and queued requests expire rather than firing
+after a long stall. Pauses, menu overlays and rewind/fast-forward states block
+the mod's choice input. The mod does not choose for you, advance the conversation
+on its own, pause a choice timer or extend its deadline. Timed choices are
+identified as timed; long speech may still outlast the game's deadline.
+When choices close, their readout is cancelled if it is still the mod's latest
+announcement, without cancelling a newer menu or prompt readout.
+
+The implementation is based on a passive capture of the classroom question
+and the game's own widget and input code. The initial dialogue build has passed
+its playtest; this does not establish coverage of every later question, timed
+choice or rewind transition. This does not add spoken subtitles or
+repeat the characters' voiced dialogue.
 
 ## Starting and controls
 
@@ -108,7 +144,7 @@ use; existing saves are not disposable test data.
 | Enter | The game's accept/select action |
 | Escape | The game's back/cancel action |
 | R | Repeat the last current menu readout while the mod has readable menu focus |
-| F1 | Read help for readable menu focus, or navigation help during supported gameplay |
+| F1 | Read help for readable menu focus, dialogue, or navigation during supported gameplay |
 | F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
 
 R remains the game's rewind key outside menu narration. Native movement bindings

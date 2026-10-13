@@ -65,6 +65,11 @@ int main() {
     lis::Speak(L"Photo \u2014 caf\u00e9",true);
     Check(nvda.text==u8"Photo \u2014 caf\u00e9"&&nvda.brailleText==nvda.text&&nvda.interrupt,"same UTF-8 text reaches speech and braille");
     lis::Speak(L"Queued",false);Check(!nvda.interrupt&&nvda.inits==1,"noninterrupting output preserves queue flag and backend lifetime");
+    const auto obsolete=lis::SpeechSerial();const int stops=nvda.stops;
+    lis::Speak(L"Newer menu readout");lis::StopSpeechIfCurrent(obsolete);
+    Check(nvda.stops==stops,"obsolete dialogue cannot cancel newer menu speech");
+    const auto current=lis::SpeechSerial();lis::StopSpeechIfCurrent(current);lis::StopSpeechIfCurrent(current);
+    Check(nvda.stops==stops+1,"current dialogue cancellation stops once and invalidates its token");
     nvda.brailleResult=PRISM_ERROR_INTERNAL;
     const int spoken=nvda.speaks;
     lis::Speak(L"Braille failure");
