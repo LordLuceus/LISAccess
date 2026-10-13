@@ -1,5 +1,25 @@
 # LISAccess changelog
 
+## 2026-10-13 — Tutorials and startup messages
+
+- Added narration for tutorial/HUD text announcements and composed startup
+  slides/popups, including the autosave explanation and animated tutorial captions.
+  Timed startup readouts queue instead of cutting each other short.
+  A message is read when it appears or changes, not continuously while it stays
+  on screen.
+- The narrated photo, selfie and general interaction tutorials explain scanner
+  selection, facing and announced action controls instead of mouse dragging.
+  Other text and the original visual tutorials are left unchanged.
+  Other captions in the same panel remain intact.
+- Ctrl+Home repeats the latest gameplay prompt, including after it disappears.
+  Holding the left-stick click and pressing D-pad right does the same. This
+  replaces that chord's duplicate sound-preview binding; left-stick + D-pad left
+  still previews sounds. R remains rewind in gameplay and reread in menus.
+
+Startup narration and the photo and selfie tutorials have been playtested
+successfully. This does not add dialogue choices, subtitles, video/image text or
+a saving-status announcement.
+
 ## 2026-10-13 — Prism speech and braille
 
 - Mod announcements now use Prism, including braille through supported screen

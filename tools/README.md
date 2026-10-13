@@ -34,6 +34,20 @@ python tools/inspect_ue3_tables.py "$game\LifeIsStrangeGame\CookedPCConsoleFinal
 Full JSON output contains proprietary game metadata. Keep it local; do not add the
 artifacts directory to a public repository or release.
 
+## Flash movie extraction
+
+`extract_flash.py` uses the package metadata above to extract one identified
+`SwfMovie` export. It verifies the package SHA-256, decompresses only intersecting
+LZO blocks and refuses to overwrite output. It does not execute Flash or modify
+the game. A separately installed Flash decompiler can inspect the result.
+
+```powershell
+python tools/extract_flash.py artifacts/packages/ExampleGame.json SN_Announcement.Flash.Announcement artifacts/announcement.gfx --lzo artifacts/vendor/dissect-lzo/lzo.py
+```
+
+Keep extracted movies and decompiled scripts in ignored `artifacts/`; they are
+proprietary game data and must not be distributed with the mod.
+
 ## Native tools
 
 `rea-session.mjs` keeps one MCP connection alive for related calls. It uses the

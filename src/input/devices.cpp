@@ -19,12 +19,12 @@ Presses Devices::ReadKeyboard(bool foreground,uint64_t now) {
     const Modifiers modifiers{(GetAsyncKeyState(VK_SHIFT)&0x8000)!=0,(GetAsyncKeyState(VK_CONTROL)&0x8000)!=0,(GetAsyncKeyState(VK_MENU)&0x8000)!=0};
     return keyboard_.Update(raw,modifiers,foreground,now);
 }
-Presses Devices::ReadController(int controllerIndex,bool active,uint64_t now) {
+Presses Devices::ReadController(int controllerIndex,bool active,uint64_t now,bool repeatAllowed) {
     if(controllerIndex>=0&&controllerIndex<4)padIndex_=controllerIndex;
     XINPUT_STATE pad{};
     const bool connected=getPadState_&&getPadState_(static_cast<DWORD>(padIndex_),&pad)==ERROR_SUCCESS;
     if(connected&&(!padWasConnected_||previousPadIndex_!=padIndex_))controller_.Update(pad.Gamepad.wButtons,false,now);
-    const auto presses=controller_.Update(connected?pad.Gamepad.wButtons:0,active&&connected,now);
+    const auto presses=controller_.Update(connected?pad.Gamepad.wButtons:0,active&&connected,now,repeatAllowed&&connected);
     padWasConnected_=connected;previousPadIndex_=padIndex_;
     return presses;
 }

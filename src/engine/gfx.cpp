@@ -8,7 +8,7 @@
 
 namespace lis::engine::gfx {
 namespace {
-uintptr_t base = 0, menu = 0, stringFn = 0, numberFn = 0, invokeFn = 0;
+uintptr_t base = 0, menu = 0, stringFn = 0, numberFn = 0, invokeFn = 0, objectStringFn = 0, boolFn = 0;
 struct FString { wchar_t* data; int count; int capacity; };
 static_assert(sizeof(FString) == 12);
 ObjectRegistry Registry() { return ObjectRegistry(base, RegistryPolicy::Menu); }
@@ -16,15 +16,15 @@ std::string Name(int index) { return Registry().Name(index); }
 std::string ObjectName(uintptr_t object) { return Registry().NameOf(object); }
 std::string ClassName(uintptr_t object) { return Registry().ClassOf(object); }
 bool Registered(uintptr_t object) { return Registry().Registered(object); }
-bool Function(uintptr_t fn, const char* name, int size) {
+bool Function(uintptr_t fn, const char* name, int size,const char* owner="GFxMoviePlayer") {
     return Registered(fn) && ClassName(fn) == "Function" && ObjectName(fn) == name &&
-        ObjectName(Read<uintptr_t>(fn + 0x28)) == "GFxMoviePlayer" &&
+        ObjectName(Read<uintptr_t>(fn + 0x28)) == owner &&
         Read<unsigned short>(fn + 0xa2) == size && (Read<unsigned>(fn + 0x90) & 0x400);
 }
 // Both UObject and AActor dispatchers end in ret 0x0c: THREE stack arguments.
 // The legacy result pointer is unused on this path but must still be supplied.
-void Event(uintptr_t fn, void* args) {
-    reinterpret_cast<engine::ProcessEvent>(base + profile::ObjectDispatch)(reinterpret_cast<void*>(menu), reinterpret_cast<void*>(fn), args, nullptr);
+void Event(uintptr_t fn, void* args,uintptr_t receiver=0) {
+    reinterpret_cast<engine::ProcessEvent>(base + profile::ObjectDispatch)(reinterpret_cast<void*>(receiver?receiver:menu), reinterpret_cast<void*>(fn), args, nullptr);
 }
 std::wstring TakeString(FString& value) {
     std::wstring text;
@@ -57,10 +57,12 @@ void Discover() {
     for (uintptr_t obj : objects) {
         if (!obj) continue;
         const std::string cls = ClassName(obj);
+        if(cls=="Function" && Function(obj,"GetString",24,"GFxObject"))objectStringFn=obj;
         if (cls == "Function" && ObjectName(Read<uintptr_t>(obj + 0x28)) == "GFxMoviePlayer") {
             std::string name = ObjectName(obj);
             if (name == "GetVariableString" && Function(obj, name.c_str(), 24)) stringFn = obj;
             if (name == "GetVariableNumber" && Function(obj, name.c_str(), 16)) numberFn = obj;
+            if (name == "GetVariableBool" && Function(obj, name.c_str(), 16)) boolFn = obj;
             if (name == "Invoke" && Function(obj, name.c_str(), 48)) invokeFn = obj;
         }
         if (cls == "OutGameSensenMenu" && ObjectName(obj).find("Default__") != 0 &&
@@ -68,15 +70,49 @@ void Discover() {
     }
 }
 std::wstring String(const std::string& path) {
+    return String(menu,path);
+}
+std::wstring String(uintptr_t receiver,const std::string& path) {
     std::wstring input = Wide(path);
     struct Params { FString path; FString result; } p{Borrow(input), {}};
-    Event(stringFn, &p);
+    Event(stringFn, &p,receiver);
     return TakeString(p.result);
 }
 float Number(const std::string& path) {
+    return Number(menu,path);
+}
+float Number(uintptr_t receiver,const std::string& path) {
     std::wstring input = Wide(path);
     struct Params { FString path; float result; } p{Borrow(input), 0};
-    Event(numberFn, &p); return p.result;
+    Event(numberFn, &p,receiver); return p.result;
+}
+bool ValidMovie(uintptr_t receiver) {
+    return Registry().Instance(receiver) && Registry().IsA(receiver,"GFxMoviePlayer") &&
+        Read<uintptr_t>(Read<uintptr_t>(receiver)+72*4)==base+profile::ObjectDispatch &&
+        Function(stringFn,"GetVariableString",24) && Function(numberFn,"GetVariableNumber",16);
+}
+bool ObjectQueriesReady(){return Function(objectStringFn,"GetString",24,"GFxObject");}
+std::wstring DisplayString(const std::string& path){return DisplayString(menu,path);}
+std::wstring DisplayString(uintptr_t receiver,const std::string& path) {
+    auto ends=[&](const std::string& suffix){return path.size()>=suffix.size()&&path.compare(path.size()-suffix.size(),suffix.size(),suffix)==0;};
+    if(ends("._alpha"))return std::to_wstring(Number(receiver,path));
+    if(ends("._visible")||ends(".shadow_text")) {
+        if(!Function(boolFn,"GetVariableBool",16))return {};
+        std::wstring input=Wide(path);
+        struct Params {FString path;uint32_t result;} p{Borrow(input),0};
+        static_assert(sizeof(Params)==16);
+        Event(boolFn,&p,receiver);
+        return p.result?L"true":L"false";
+    }
+    return String(receiver,path);
+}
+std::wstring ObjectString(uintptr_t object,const std::string& member) {
+    if(!ObjectQueriesReady() || !Registry().Instance(object) || !Registry().IsA(object,"GFxObject") ||
+        Read<uintptr_t>(Read<uintptr_t>(object)+72*4)!=base+profile::ObjectDispatch)return {};
+    std::wstring input=Wide(member);
+    struct Params {FString member;FString result;} p{Borrow(input),{}};
+    Event(objectStringFn,&p,object);
+    return TakeString(p.result);
 }
 std::wstring Text(const std::string& objectPath) {
     std::wstring method = Wide(objectPath + ".GetText");

@@ -27,6 +27,10 @@ int main() {
     check(!p[idx(Command::Action1)],"focus return cannot activate held action");
     k={};p=k.Update(raw,{false,true,false},true,0);
     check(!p[idx(Command::Action1)],"modified game controls are left alone");
+    k={};raw={};raw[idx(Command::Describe)]=raw[idx(Command::Beacon)]=raw[idx(Command::RepeatPrompt)]=true;
+    p=k.Update(raw,{false,true,false},true,0);
+    check(p[idx(Command::RepeatPrompt)]&&!p[idx(Command::Describe)]&&!p[idx(Command::Beacon)],"Ctrl Home repeats only the prompt");
+    p=k.Update(raw,{},true,1);check(std::none_of(p.begin(),p.end(),[](bool b){return b;}),"releasing Control does not fire held Home");
     Controller pad;
     p=pad.Update(8,true,0);check(p[idx(Command::Next)],"controller cycles target");
     check(pad.Update(8,true,450)[idx(Command::Next)],"controller target repeat");
@@ -41,5 +45,12 @@ int main() {
     check(!p[idx(Command::Face)],"disconnect is not a face-button release");
     pad={};p=pad.Update(0xf000,true,0);
     check(std::none_of(p.begin(),p.end(),[](bool b){return b;}),"native face buttons are never synthesized or doubled");
+    pad={};pad.Update(0x40,true,0);p=pad.Update(0x48,true,1);
+    check(p[idx(Command::RepeatPrompt)]&&!p[idx(Command::Preview)]&&!p[idx(Command::Next)],"stick plus right repeats rather than previewing or cycling");
+    p=pad.Update(0,true,2);check(!p[idx(Command::Face)],"prompt chord cannot face on release");
+    pad={};pad.Update(0x40,false,0,true);p=pad.Update(0x48,false,1,true);
+    check(p[idx(Command::RepeatPrompt)]&&std::count(p.begin(),p.end(),true)==1,"prompt repeat works during paused tutorials without enabling gameplay commands");
+    pad={};pad.Update(0x40,true,0);p=pad.Update(0x44,true,1);
+    check(p[idx(Command::Preview)]&&!p[idx(Command::RepeatPrompt)],"stick plus left retains sound preview");
     return failures?1:0;
 }

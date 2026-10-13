@@ -18,6 +18,9 @@ is safe.
   reader and retaining Windows SAPI as a system-speech fallback.
 - Sends mod announcements to the selected reader's braille channel as well as
   speech, when that reader supports braille.
+- Reads visible tutorial prompts, HUD notices and composed startup popups such
+  as the autosave explanation. The narrated photo, selfie and general interaction
+  tutorials describe the mod's scanner/action controls instead of mouse dragging.
 - Reads the game's actual focused title/menu button, rather than estimating
   selection from keypresses.
 - Describes the selected save slot using its displayed name, episode/checkpoint
@@ -50,6 +53,31 @@ and queue requests are retained. The mod log records provider changes and output
 failures, not the contents of announcements. The migrated output has been
 playtested successfully; other reader and braille-display combinations may still
 need testing.
+
+## Prompts and startup notices
+
+Tutorial prompts and text announcements are read as they appear, including text
+captions on animated tutorial panels. Timed startup slides and popups use their
+actual composed text rather than a fixed English substitute. Startup readouts
+queue so the next slide or automatic title message does not cut them short;
+explicit reread and subsequent menu navigation still interrupt. During
+gameplay, **Ctrl+Home** repeats the latest captured prompt, even after it fades.
+On a controller, hold the left-stick click and press **D-pad right**. These repeat
+commands do not select or dismiss a prompt. **R remains rewind in gameplay**;
+in readable menus and startup popups, R repeats the current readout as before.
+
+The photo, selfie and general interaction tutorials have adapted speech/braille
+instructions for selecting a scanner target, facing it and choosing the announced
+action. Their original visual text is not modified. Other messages retain the
+game's displayed text and language; the adapted helper instructions are currently
+English. Automatic prompts queue after other announcements; deliberate navigation
+or repeat commands can interrupt them.
+
+This reader covers the inspected tooltip, quote, HUD-prompt, notification and
+animated-tutorial captions, plus composed menu popups and startup slides—not text
+baked into videos or images. It does not add subtitles or dialogue-choice support,
+nor announcements for the autosave icon itself. Startup narration and the photo
+and selfie tutorials have been playtested successfully.
 
 ## Starting and controls
 
@@ -93,6 +121,7 @@ to the camera, not Max's body orientation.
 | Page Down / Page Up | Select next / previous scanner target; hold to repeat |
 | Home | Describe the selected target; with no selection, repeat focused-object actions |
 | Shift+Home | Toggle the selected target's directional beacon |
+| Ctrl+Home | Repeat the latest tutorial/HUD prompt, including after it fades |
 | F | Request camera facing toward the selected target |
 | Number row 1, 2, 3, 4 | Use the focused object's announced action; equivalents of controller Y, X, B, A |
 | F1 | Read navigation help |
@@ -115,11 +144,14 @@ menu is active or visible, since it also uses the D-pad.
 | Click the left stick | Face the selected target on button release |
 | Hold left-stick click + D-pad down | Toggle obstacle cues |
 | Hold left-stick click + D-pad up | Read help |
-| Hold left-stick click + D-pad left or right | Preview the next sound |
+| Hold left-stick click + D-pad left | Preview the next sound |
+| Hold left-stick click + D-pad right | Repeat the latest tutorial/HUD prompt, including after it fades |
 | Y, X, B, A | The game's native actions, announced with their button names |
 
 A left-stick chord does not also trigger facing on release. Native face buttons
 are not emulated or duplicated, and the mod does not force an input-mode switch.
+Prompt repeat remains available when a tutorial pauses normal gameplay; other
+scanner and interaction commands keep their existing availability checks.
 
 ### Selecting and using an object
 

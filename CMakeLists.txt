@@ -45,6 +45,7 @@ add_library(lis_features OBJECT
     src/features/interactions/scanner.cpp
     src/features/menus/diagnostics.cpp
     src/features/menus/menus.cpp
+    src/features/prompts/prompts.cpp
     src/features/navigation/collision.cpp
     src/features/navigation/description.cpp
     src/features/navigation/navigation.cpp
@@ -79,6 +80,8 @@ function(lis_test target name)
     add_test(NAME ${name} COMMAND ${target})
 endfunction()
 lis_test(narration_test narration tests/narration_test.cpp)
+lis_test(popup_test startup_popup tests/popup_test.cpp)
+lis_test(prompts_test prompt_policy tests/prompts_test.cpp)
 lis_test(navigation_test navigation_geometry tests/navigation_test.cpp)
 lis_test(native_abi_test native_dispatch_abi tests/native_abi_test.cpp)
 lis_test(input_commands_test input_commands tests/input_commands_test.cpp)

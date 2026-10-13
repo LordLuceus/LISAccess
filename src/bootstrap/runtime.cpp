@@ -5,6 +5,7 @@
 #include "features/menus/menus.h"
 #include "features/menus/diagnostics.h"
 #include "features/navigation/navigation.h"
+#include "features/prompts/prompts.h"
 #include "platform/foreground.h"
 #include "platform/log.h"
 #include "output/speech.h"
@@ -21,6 +22,7 @@ std::atomic<bool> failed{false};
 std::wstring localDirectory;
 
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
+    prompts::Tick();
     navigation::Tick();
     if (!failed && !menus::SafeSnapshot()) { failed = true; Log("event=bridge_fault status=disabled"); }
 }
@@ -67,6 +69,7 @@ void RunRuntime(HMODULE module) {
     previousProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WindowProc)));
     if (!previousProc) { Log("event=subclass_failed"); Speak(L"Could not attach menu inspection."); return; }
     navigation::Initialize(module);
+    prompts::Initialize(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
     timer = SetTimer(window, 0x4c4953, 200, TimerProc);
     if (!timer) { Log("event=timer_failed"); Speak(L"Could not start menu inspection."); return; }
     Log("event=bridge_ready window_thread=" + std::to_string(GetWindowThreadProcessId(window, nullptr)));
@@ -77,9 +80,11 @@ void RunRuntime(HMODULE module) {
         if (failed && !faultSpoken) { Speak(L"Menu inspection failed and has been disabled. See the mod log."); faultSpoken = true; }
         bool readableMenu = false;
         const bool foreground = IsGameForeground();
-        std::wstring speech = menus::ConsumeSpeech(foreground, wasForeground, readableMenu);
-        if (!speech.empty() && foreground) Speak(speech);
+        bool interrupt=true;
+        std::wstring speech = menus::ConsumeSpeech(foreground, wasForeground, readableMenu,interrupt);
+        if (!speech.empty() && foreground) Speak(speech,interrupt);
         navigation::Pump(foreground, readableMenu);
+        prompts::Pump(foreground,readableMenu);
         wasForeground = foreground;
         Sleep(25);
     }

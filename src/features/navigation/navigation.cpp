@@ -4,6 +4,7 @@
 #include "features/world/world.h"
 #include "features/interactions/actions.h"
 #include "features/camera/facing.h"
+#include "features/prompts/prompts.h"
 #include "output/audio_cues.h"
 #include "output/speech.h"
 #include "platform/log.h"
@@ -95,10 +96,11 @@ void Pump(bool foreground, bool readableMenu) {
     if(foreground&&!reply.empty())Speak(reply);
     const bool fresh=at && now-at<=450;
     const bool active=foreground && fresh && s.active && !s.interactionBusy && !readableMenu;
-    const auto padPresses=devices.ReadController(s.controllerIndex,active,now);
+    const auto padPresses=devices.ReadController(s.controllerIndex,active,now,foreground&&!readableMenu);
     if(std::any_of(padPresses.begin(),padPresses.end(),[](bool value){return value;}))s.gamepad=true;
     else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;}))s.gamepad=false;
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
+    if(foreground&&!readableMenu&&pressed[static_cast<size_t>(input::Command::RepeatPrompt)])prompts::RequestRepeat();
     if(foreground&&s.interactionsFailed&&!warnedInteractions){Speak(L"Interaction scanning failed and has been disabled. Navigation is still available.");warnedInteractions=true;}
     if(!foreground || (!active && !readableMenu)) {
         audio::SetEnabled(false);previewPending=false;
@@ -149,7 +151,7 @@ void Pump(bool foreground, bool readableMenu) {
     }
     if(now<previewUntil) return;
     if(!active) { if(now>=previewAt+700) audio::SetEnabled(false);return; }
-    if(pressed[4]) Speak(L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. On a controller: D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face. Native Y, X, B and A keep their announced actions. F2 toggles obstacle cues; F3 previews sounds. Hold the left stick and press D pad down for obstacle cues, up for help, or left or right for sound previews. Beacons give direction, not a safe route. R remains rewind.");
+    if(pressed[4]) Speak(L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. Control Home repeats the latest prompt. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. On a controller: D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face. Native Y, X, B and A keep their announced actions. F2 toggles obstacle cues; F3 previews sounds. Hold the left stick and press D pad down for obstacle cues, up for help, left for sound previews, or right to repeat the latest prompt. Beacons give direction, not a safe route. R remains rewind.");
     if(pressed[5]) {
         obstacles=!obstacles;
         if(obstacles && !audio::Available(audio::Cue::Obstacle)) {obstacles=false;Speak(L"Obstacle sound is unavailable.");}

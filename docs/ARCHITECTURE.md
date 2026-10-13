@@ -18,8 +18,8 @@ Prism library; the migration does not add gameplay features or dialogue choices.
   commands rather than executing game actions or producing speech.
 - **`output/`** owns speech-backend lifetime and audio-cue playback. Backend changes
   belong here, not in individual menus or scanner features.
-- **`features/`** owns player-facing decisions. Menus, world sampling, navigation,
-  interaction scanning/actions and explicit camera facing have their own files.
+- **`features/`** owns player-facing decisions. Menus, prompts, world sampling,
+  navigation, interaction scanning/actions and explicit camera facing have their own files.
   A future dialogue feature belongs here, not in the bootstrap worker.
 
 CMake lists each module's sources explicitly and compiles the reusable modules as
@@ -40,7 +40,7 @@ literal text; the upstream snapshot stays pristine for notice verification.
 
 ### Game-thread access versus worker output
 
-Menu snapshots, world queries, interaction activation and camera requests retain
+Menu/prompt snapshots, world queries, interaction activation and camera requests retain
 their game/window-thread execution. The worker polls input, narrates copied
 snapshots and plays sounds. Requests cross the existing locked handoff and are
 revalidated on the game thread; moving files is not permission to call native
@@ -65,9 +65,38 @@ Reset remains deliberately partial. Native faults stay latched; thread binding,
 translations and certain cached handles retain their original lifetime. Review
 those contracts before changing ownership or reset logic.
 
-The GFx bridge remains the existing menu-bound adapter, not a claim of arbitrary
-GFx-object support. Native ABI declarations live in `engine/abi.h`, and verified
-build RVAs live in `engine/build_profile.h`.
+The GFx bridge retains its menu-bound entry points and adds explicit verified movie
+receivers for announcement queries. Its narrow GFxObject string getter retrieves
+clip paths; visibility uses the typed boolean/number getters rather than assuming
+string coercion. This is not an arbitrary native-call interface. Native ABI
+declarations live in `engine/abi.h`, and verified build RVAs live in
+`engine/build_profile.h`.
+
+`features/prompts` has an independent game-thread reader/fault boundary, so a
+tutorial can be read while the world-navigation gate is closed. It reads only the
+inspected tooltip, quote, prompt, notification and animated-caption channels, not dialogue or
+subtitles. Reflected native state and actual Flash visibility gate the readout.
+The shipped `DNEOpenAnimationSeq` has its own opening-state enumeration; do not
+substitute the menu/native enumeration. Its flat `open_seq.sub_sequences` stores
+clip references, including anonymous composition children and decorative shadows.
+Popup and prompt extraction tests model that structure; they do not prove that a
+live receiver or path is correct. Startup and photo/selfie acquisition have also
+passed in-game testing. Detailed prompt-state diagnostics are retained behind
+the default-off `TracePrompts` flag for future investigation.
+
+Pure extraction and history policy retain timed prompts for repeat and detect
+display/text transitions. Exact tutorial IDs select accessibility wording; other
+messages keep rendered localization. Match HUD.INT's actual `[Tuto]` section;
+`DNENotification` uppercases device-dependent IDs. Adapt each text leaf rather
+than replacing a whole notification container with its first label's rewrite.
+Widget `Owner` supplies the query receiver, with the original discovery receiver
+retained as a fallback. Worker output queues automatic prompts after
+menu/scanner announcements. Repeat interrupts without invoking a game action.
+The boot page is not a selectable menu: `CMD_BOOTSEQUENCE.SequenceRoot_mc` is
+replaced for each timed slide. Read that composition and queue the readouts,
+including the automatic title transition, without delaying or advancing the game.
+The controller repeat chord has a separate availability flag: allowing it while
+navigation is paused must not enable facing or other scanner commands.
 
 ## Keeping modules small
 
