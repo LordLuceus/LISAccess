@@ -89,12 +89,20 @@ On a controller, hold the left-stick click and press **D-pad right**. These repe
 commands do not select or dismiss a prompt. **R remains rewind in gameplay**;
 in readable menus and startup popups, R repeats the current readout as before.
 
+Controller tutorial readouts include recognized button icons as names such as
+LT, RT and the stick names. The game's own controller descriptions supply the
+controls; keyboard readouts keep the game's existing wording. If a recognized
+control cannot be reconstructed safely, the visible message is kept and the mod
+says that controller button names are unavailable. Controller-icon readouts have
+passed their in-game playtest.
+
 The photo, selfie and general interaction tutorials have adapted speech/braille
 instructions for selecting a scanner target, facing it and choosing the announced
 action. Their original visual text is not modified. Other messages retain the
-game's displayed text and language; the adapted helper instructions are currently
-English. Automatic prompts queue after other announcements; deliberate navigation
-or repeat commands can interrupt them.
+game's displayed text and language; the adapted helper instructions, stick-name
+labels and unavailable-control notice are currently English. Automatic prompts
+queue after other announcements; deliberate navigation or repeat commands can
+interrupt them.
 
 This reader covers the inspected tooltip, quote, HUD-prompt, notification and
 animated-tutorial captions, plus composed menu popups and startup slides—not text

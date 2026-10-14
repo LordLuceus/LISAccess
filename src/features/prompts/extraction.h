@@ -4,8 +4,8 @@
 
 namespace lis::prompts {
 struct Caption {std::wstring key,text;};
-template<class StringQuery,class NumberQuery>
-Caption ReadComposition(const std::string& path,const StringQuery& string,const NumberQuery& number) {
+template<class StringQuery,class NumberQuery,class ControlReader>
+Caption ReadComposition(const std::string& path,const StringQuery& string,const NumberQuery& number,const ControlReader& controls) {
     // Shipped DNEOpenAnimationSeq: closed=0, closing=1, opening=2, opened=3.
     const float opening=number(path+".opening_state");
     if((opening!=2&&opening!=3)||!menus::PopupVisible(path,string))return {};
@@ -27,9 +27,13 @@ Caption ReadComposition(const std::string& path,const StringQuery& string,const 
         }
         // Notifications can contain several independent instructions. Adapt each
         // leaf, never replace a whole container using its first label's ID.
-        parts.push_back(Adapt(key,text));
+        parts.push_back(Adapt(key,controls(key,text)));
     }
     result.text=DescribeMenu(parts);
     return result;
+}
+template<class StringQuery,class NumberQuery>
+Caption ReadComposition(const std::string& path,const StringQuery& string,const NumberQuery& number) {
+    return ReadComposition(path,string,number,[](const auto&,const auto& text){return text;});
 }
 }

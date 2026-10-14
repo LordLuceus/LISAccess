@@ -16,12 +16,19 @@ std::wstring Localization::Translate(const ObjectRegistry& registry,uintptr_t ba
     if(key.rfind(L"$GT_",0)!=0)return key;
     auto cached=translations.find(key);if(cached!=translations.end())return cached->second;
     const auto a=key.find(L'_',4),b=a==std::wstring::npos?a:key.find(L'_',a+1);
-    if(b==std::wstring::npos || !registry.Registered(localize) || Read<uint16_t>(localize+0xa2)!=48 || Read<uint16_t>(localize+0xa4)!=36 || Read<uint16_t>(localize+0x94)!=0) return unavailable;
+    if(b==std::wstring::npos || !registry.Instance(controller)||!registry.Registered(localize)||
+       registry.ClassOf(localize)!="Function"||registry.NameOf(localize)!="Localize"||
+       registry.NameOf(Read<uintptr_t>(localize+0x28))!="Object"||
+       Read<uint16_t>(localize+0xa2)!=48 || Read<uint16_t>(localize+0xa4)!=36 || Read<uint16_t>(localize+0x94)!=0) return unavailable;
+    const auto dispatch=Read<uintptr_t>(Read<uintptr_t>(controller)+72*4);
+    // Object.Localize is also valid on a GFx movie. Use the verified receiver's
+    // dispatcher rather than forcing a non-Actor through AActor::ProcessEvent.
+    if(dispatch!=base+profile::ActorDispatch&&dispatch!=base+profile::ObjectDispatch)return unavailable;
     std::wstring package=key.substr(4,a-4),section=key.substr(a+1,b-a-1),item=key.substr(b+1);
     auto borrow=[](std::wstring& text){return String{reinterpret_cast<uintptr_t>(text.data()),static_cast<int>(text.size()+1),static_cast<int>(text.size()+1)};};
     struct Params {String section,key,package,result;} p{borrow(section),borrow(item),borrow(package),{}};
     static_assert(sizeof(Params)==48);
-    reinterpret_cast<engine::ProcessEvent>(base+profile::ActorDispatch)(reinterpret_cast<void*>(controller),reinterpret_cast<void*>(localize),&p,nullptr);
+    reinterpret_cast<engine::ProcessEvent>(dispatch)(reinterpret_cast<void*>(controller),reinterpret_cast<void*>(localize),&p,nullptr);
     std::wstring result;
     if(p.result.data && p.result.count>0 && p.result.count<=8192 && p.result.capacity>=p.result.count) {
         result.resize(p.result.count-1);

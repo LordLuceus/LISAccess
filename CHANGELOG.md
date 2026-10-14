@@ -1,5 +1,12 @@
 # LISAccess changelog
 
+## 2026-10-14 — Controller buttons in tutorial prompts
+
+- Controller tutorial readouts now include recognized button names, such as LT
+  in the rewind instruction and RT in the move-faster instruction, instead of
+  leaving a gap where the button icon appears. The game's message language and
+  keyboard readouts are preserved. Prompt repeat retains the button names too.
+
 ## 2026-10-14 — Dialogue after using menus
 
 - Fixed visible dialogue choices becoming silent and numbered choice keys reporting

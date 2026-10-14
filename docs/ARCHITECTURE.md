@@ -158,6 +158,24 @@ live receiver or path is correct. Startup and photo/selfie acquisition have also
 passed in-game testing. Detailed prompt-state diagnostics are retained behind
 the default-off `TracePrompts` flag for future investigation.
 
+Controller caption restoration reads the live `DynamicInputSwitchManager` mode
+and `GamepadActionList` (reflected 20-byte FName/FString rows), not connected-device
+presence or an INI default. The shipped table covers all ten action-token names
+found across the seven installed HUD translations. `DNETooltipRegister` establishes
+the abstract glyph-to-XInput button vocabulary. No individual tutorial sentence
+selects a binding. Keyboard mode retains the original rendered caption.
+
+For a visible controller caption, its already-selected `wanted_text` is localized
+fresh through `Object.Localize`, using the verified movie receiver's UObject
+dispatcher rather than an Actor dispatcher. Source prose with controls removed
+must agree with the visible text (ignoring embedded/private-use glyphs) before
+restoration; mismatches or missing action mappings retain the visible message and
+report unavailable control names. This does not repair missing source IDs or failed
+localization. Bounds and recursion limits reject malformed/cyclic descriptions.
+Real English/French/German tutorial fixtures, authored action mappings, changed
+runtime bindings, keyboard preservation, visibility and repeat are covered by tests;
+the native metadata/localization path has also passed its in-game playtest.
+
 Pure extraction and history policy retain timed prompts for repeat and detect
 display/text transitions. Exact tutorial IDs select accessibility wording; other
 messages keep rendered localization. Match HUD.INT's actual `[Tuto]` section;

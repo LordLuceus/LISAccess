@@ -1,6 +1,7 @@
 #include "features/prompts/prompts.h"
 #include "features/prompts/policy.h"
 #include "features/prompts/extraction.h"
+#include "features/prompts/control_data.h"
 #include "engine/gfx.h"
 #include "engine/reflection.h"
 #include "platform/log.h"
@@ -12,7 +13,7 @@
 namespace lis::prompts {
 namespace {
 engine::Reflection reflection;
-uintptr_t movie=0;
+uintptr_t movie=0,controlManager=0,localize=0,gameBase=0;
 DWORD thread=0;
 uint64_t nextDiscovery=0;
 bool initialized=false,faulted=false,faultReported=false,repeat=false;
@@ -31,21 +32,26 @@ void Discover(uint64_t now) {
     if(!reflection.registry.Registry(a))return;
     std::vector<uintptr_t> objects(a.count);
     if(!engine::Copy(objects.data(),a.data,objects.size()*4))return;
-    movie=0;
+    movie=0;controlManager=0;unsigned managers=0;
     for(auto p:objects) {
         const auto cls=reflection.registry.ClassOf(p);
         if(cls=="GFxUIAnnouncement"&&engine::gfx::ValidMovie(p))movie=p;
+        if(cls=="DynamicInputSwitchManager"&&ValidControlManager(reflection,p)){controlManager=p;++managers;}
+        if(cls=="Function"&&reflection.registry.NameOf(p)=="Localize"&&
+           reflection.registry.NameOf(engine::Read<uintptr_t>(p+0x28))=="Object")localize=p;
         if(cls.find("Property")==std::string::npos)continue;
         const auto owner=reflection.registry.NameOf(engine::Read<uintptr_t>(p+0x28));
-        if(owner=="GFxWidget"||owner=="GFxUIWidgets"||owner=="GFxUIWidgetPlayer")
+        if(owner=="GFxWidget"||owner=="GFxUIWidgets"||owner=="GFxUIWidgetPlayer"||
+           owner=="DynamicInputSwitchManager"||owner=="GamepadActionDescription")
             reflection.Observe(p,cls,reflection.registry.NameOf(p));
     }
+    if(managers!=1)controlManager=0;
 }
 void State(const std::string& channel,const std::string& state) {
     if constexpr(!TracePrompts)return;
     if(diagnostics[channel]!=state){diagnostics[channel]=state;Log("event=prompt_state channel="+channel+" "+state);}
 }
-Item Read(const char* channel,uintptr_t widgets) {
+Item Read(const char* channel,uintptr_t widgets,const Controls& controls) {
     Item item{channel,{},{}};
     int offset=0;
     if(!reflection.StructOffset("GFxUIWidgets",channel,offset)){State(channel,"status=missing_widget_metadata");return item;}
@@ -69,28 +75,35 @@ Item Read(const char* channel,uintptr_t widgets) {
     if(!owned)owner=movie;
     auto string=[owner](const std::string& p){return engine::gfx::DisplayString(owner,p);};
     auto number=[owner](const std::string& p){return engine::gfx::Number(owner,p);};
-    const auto caption=ReadComposition(path,string,number);
+    auto restore=[&](const std::wstring& key,const std::wstring& displayed) {
+        if(controls.mode!=1)return displayed;
+        const auto source=LocalizedCaption(reflection,gameBase,localize,owner,key);
+        const auto result=ControllerCaption(source,displayed,controls);
+        return result.text;
+    };
+    const auto caption=ReadComposition(path,string,number,restore);
     item.text=caption.text; // Leaf-level adaptation has already preserved other captions.
     if constexpr(TracePrompts)State(channel,state+" owner_resolved="+std::to_string(owned)+" owner_matches_discovery="+std::to_string(owner==movie)+" script_opening="+std::to_string(number(path+".opening_state"))+" text="+std::to_string(!item.text.empty())+" key="+Utf8(caption.key));
     return item;
 }
 void Snapshot() {
     const auto now=GetTickCount64();
-    if(!engine::gfx::ValidMovie(movie)) {
+    if(!engine::gfx::ValidMovie(movie)||!ValidControlManager(reflection,controlManager)||!reflection.registry.Registered(localize)) {
         if(now>=nextDiscovery)Discover(now);
     }
     std::vector<Item> frame;
+    const auto controls=ReadControls(reflection,controlManager);
     uintptr_t widgets=0;
     if(engine::gfx::ValidMovie(movie)&&engine::gfx::ObjectQueriesReady()&&
        reflection.Value(movie,"GFxUIWidgetPlayer","UIWidgets","ObjectProperty",widgets)&&
        reflection.registry.Instance(widgets)&&reflection.registry.ClassOf(widgets)=="GFxUIWidgets") {
-        for(auto channel:channels){auto item=Read(channel,widgets);if(!item.text.empty())frame.push_back(std::move(item));}
+        for(auto channel:channels){auto item=Read(channel,widgets,controls);if(!item.text.empty())frame.push_back(std::move(item));}
     } else State("reader","status=waiting_for_announcement_movie");
     std::lock_guard<std::mutex> lock(mutex);history.Observe(frame);
 }
 bool SafeSnapshot(){__try{Snapshot();return true;}__except(EXCEPTION_EXECUTE_HANDLER){return false;}}
 }
-void Initialize(uintptr_t base){reflection.registry=engine::ObjectRegistry(base,engine::RegistryPolicy::World);initialized=true;}
+void Initialize(uintptr_t base){gameBase=base;reflection.registry=engine::ObjectRegistry(base,engine::RegistryPolicy::World);initialized=true;}
 void Tick() {
     if(!initialized||faulted)return;
     if(!thread)thread=GetCurrentThreadId();
