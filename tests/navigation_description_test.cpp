@@ -2,6 +2,15 @@
 #include <iostream>
 
 int main() {
+    int preview=-1;
+    for(int i=0;i<static_cast<int>(lis::audio::Cue::Count);++i) {
+        preview=lis::navigation::detail::NextPreview(preview);
+        if(preview!=i||std::wstring(lis::navigation::detail::PreviewName(preview)).empty())return 1;
+    }
+    if(lis::navigation::detail::NextPreview(preview)!=0||
+       std::wstring(lis::navigation::detail::PreviewName(4))!=L"Rewind approach"||
+       std::wstring(lis::navigation::detail::PreviewName(5))!=L"Rewind crossing"||
+       std::wstring(lis::navigation::detail::PreviewName(-1))!=L"Unknown sound")return 1;
     using namespace lis;
     world::Snapshot s;
     s.focusedId="photo";s.focusedLabel=L"Photo";

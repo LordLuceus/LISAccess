@@ -242,6 +242,13 @@ tested without game/audio output. The native reader, cues and readout have passe
 playtesting; temporary state/event diagnostics have been removed. A completed
 readout is remembered by existing prompt history, not a new key.
 
+Explicit sound preview owns one selected voice independently of automatic audio
+groups. Disabling navigation/rewind cannot flush that preview; focus loss or leaving
+an allowed preview context cancels it. The cycle and label coverage derive from
+the cue enum's count; playback completion, not a fixed timeout, ends a preview.
+This preview extension still needs its own in-game check; the rewind feedback
+itself is already accepted.
+
 ### Commands
 
 From the repository root:

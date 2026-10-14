@@ -31,6 +31,15 @@ int main() {
     check(!gate.Allows(CueCount) && !gate.Allows(size_t(-1)), "invalid cue rejected");
     gate.Reset();
     check(!gate.Any() && !gate.Allows(0) && !gate.Allows(5), "stop all resets both groups");
+    for(size_t selected=0;selected<CueCount;++selected) {
+        gate.Reset();gate.preview=selected;
+        check(gate.Any()&&gate.Allows(selected),"each cue can preview with automatic groups off");
+        for(size_t i=0;i<CueCount;++i) {
+            check(gate.Allows(i)==(i==selected),"preview enables only the selected cue");
+            check(gate.FlushOnDisable(i,i>=NavigationCount)==(i!=selected),"automatic-group disable preserves selected preview only");
+        }
+        gate.Reset();check(!gate.Any()&&!gate.Allows(selected),"focus-loss stop-all drops preview ownership");
+    }
     const auto approach = RewindPcm(false), crossed = RewindPcm(true);
     check(approach.size() == 3264 && crossed.size() == 5760, "bounded short mono PCM16 defaults");
     check(approach == RewindPcm(false) && crossed == RewindPcm(true), "deterministic generation");

@@ -10,4 +10,5 @@ std::wstring ActionText(const world::Snapshot& snapshot);
 std::wstring FocusText(const world::Snapshot& snapshot);
 audio::Cue CueFor(world::Kind kind);
 const wchar_t* PreviewName(int index);
+int NextPreview(int index);
 }

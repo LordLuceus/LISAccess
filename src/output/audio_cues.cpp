@@ -27,6 +27,7 @@ struct Sound {
 IXAudio2* engine = nullptr;
 IXAudio2MasteringVoice* master = nullptr;
 std::array<Sound, detail::CueCount> sounds;
+static_assert(static_cast<size_t>(Cue::Count)==detail::CueCount);
 detail::GroupGate gate;
 bool comInitialized = false;
 constexpr const wchar_t* names[] = {L"obstacle.wav", L"person.wav", L"object.wav", L"destination.wav",
@@ -109,7 +110,7 @@ void SetGroup(bool rewind, bool value) {
     }
     enabled = false;
     if (engine) engine->StopEngine();
-    Flush(rewind ? detail::NavigationCount : 0, rewind ? sounds.size() : detail::NavigationCount);
+    for(size_t i=0;i<sounds.size();++i)if(gate.FlushOnDisable(i,rewind))Flush(i,i+1);
     if (engine && gate.Any() && FAILED(engine->StartEngine())) StopAll();
 }
 }
@@ -182,6 +183,27 @@ bool Initialize(HMODULE module) {
 bool Available(Cue kind) {
     const size_t index = static_cast<size_t>(kind);
     return index < sounds.size() && sounds[index].voice;
+}
+void CancelPreview() {
+    const auto index=gate.preview;
+    if(index>=sounds.size())return;
+    gate.preview=detail::CueCount;
+    if(engine)engine->StopEngine();
+    Flush(index,index+1);
+    if(engine&&gate.Any()&&FAILED(engine->StartEngine()))StopAll();
+}
+bool Preview(Cue kind) {
+    CancelPreview();
+    if(!engine||!Available(kind)||FAILED(engine->StartEngine()))return false;
+    gate.preview=static_cast<size_t>(kind);
+    if(Play(kind,0,1))return true;
+    CancelPreview();return false;
+}
+bool PreviewPlaying() {
+    if(gate.preview>=sounds.size()||!sounds[gate.preview].voice)return false;
+    XAUDIO2_VOICE_STATE state{};
+    sounds[gate.preview].voice->GetState(&state,XAUDIO2_VOICE_NOSAMPLESPLAYED);
+    return state.BuffersQueued!=0;
 }
 bool Play(Cue kind, float pan, float gain, float rate) {
     const size_t index = static_cast<size_t>(kind);

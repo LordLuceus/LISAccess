@@ -12,11 +12,15 @@ constexpr uint32_t RewindSampleRate = 24000;
 struct GroupGate {
     bool navigation = false;
     bool rewind = false;
+    size_t preview = CueCount;
     bool Allows(size_t index) const {
-        return index < CueCount && (index < NavigationCount ? navigation : rewind);
+        return index < CueCount && (preview==index||(index < NavigationCount ? navigation : rewind));
     }
-    bool Any() const { return navigation || rewind; }
-    void Reset() { navigation = rewind = false; }
+    bool FlushOnDisable(size_t index,bool rewindGroup) const {
+        return index<CueCount&&index!=preview&&(rewindGroup?index>=NavigationCount:index<NavigationCount);
+    }
+    bool Any() const { return navigation || rewind || preview<CueCount; }
+    void Reset() { navigation = rewind = false;preview=CueCount; }
 };
 
 // Little-endian mono PCM16: two 18 ms ticks separated by 32 ms, or a

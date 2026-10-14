@@ -10,6 +10,10 @@
   can repeat the completed readout afterward. Menus and dialogue retain their
   existing input priority. Rewind sounds work independently of navigation cues,
   share the existing volume setting, and accept optional replacement WAVs.
+- The sound preview cycle now includes both rewind cues after the original four
+  sounds, using F3 or the existing controller preview command. It previews the
+  same default or replacement clip used during play, even when automatic cues
+  are inactive, and lets the clip finish rather than cutting it at a fixed delay.
 
 ## 2026-10-14 — Controller buttons in tutorial prompts
 

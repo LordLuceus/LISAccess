@@ -39,9 +39,11 @@ audio::Cue CueFor(world::Kind kind) {
     return audio::Cue::Object;
 }
 const wchar_t* PreviewName(int i) {
-    const wchar_t* names[]={L"Obstacle",L"Person",L"Object",L"Destination"};
-    return names[i];
+    const wchar_t* names[]={L"Obstacle",L"Person",L"Object",L"Destination",L"Rewind approach",L"Rewind crossing"};
+    static_assert(sizeof(names)/sizeof(*names)==static_cast<size_t>(audio::Cue::Count));
+    return i>=0&&i<static_cast<int>(audio::Cue::Count)?names[i]:L"Unknown sound";
 }
+int NextPreview(int i){return i>=0&&i<static_cast<int>(audio::Cue::Count)?(i+1)%static_cast<int>(audio::Cue::Count):0;}
 std::wstring ActionText(const world::Snapshot& s) {
     std::wstring text;
     static const wchar_t* pad[]={L"Y",L"X",L"B",L"A"};

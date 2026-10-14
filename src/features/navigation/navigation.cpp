@@ -29,7 +29,7 @@ bool configured = false, audioReady = false, obstacles = false, beacon = false;
 bool wasActive = false, diagnostics = false, previewPending = false, warnedIncomplete = false;
 bool warnedInteractions=false,warnedExits=false;
 int preview = -1;
-ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, previewUntil = 0, logAt = 0;
+ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, logAt = 0;
 std::string selected;
 input::Devices devices;
 int pendingAction=-1;
@@ -104,7 +104,7 @@ void Pump(bool foreground, bool readableMenu) {
     else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;})){s.gamepad=false;commandGamepad=false;}
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
     if(rewind::HandleInput(pressed,foreground,readableMenu,commandGamepad.value_or(false))||dialogue::HandleInput(pressed,foreground,readableMenu,commandGamepad)) {
-        audio::SetEnabled(false);previewPending=false;beacon=false;wasActive=false;
+        audio::CancelPreview();audio::SetEnabled(false);previewPending=false;beacon=false;wasActive=false;
         seenFocus.clear();spokenFocus.clear();aimingAt.clear();
         return;
     }
@@ -112,7 +112,7 @@ void Pump(bool foreground, bool readableMenu) {
     if(foreground&&s.interactionsFailed&&!warnedInteractions){Speak(L"Interaction scanning failed and has been disabled. Navigation is still available.");warnedInteractions=true;}
     if(foreground&&s.exitsFailed&&!warnedExits){Speak(L"Exit-area scanning failed and has been disabled. Other scanner targets remain available.");warnedExits=true;}
     if(!foreground || (!active && !readableMenu)) {
-        audio::SetEnabled(false);previewPending=false;
+        audio::CancelPreview();audio::SetEnabled(false);previewPending=false;
         if(wasActive) beacon=false;
         seenFocus.clear();spokenFocus.clear();
         aimingAt.clear();
@@ -142,10 +142,10 @@ void Pump(bool foreground, bool readableMenu) {
         }
     }
     if(pressed[6]) {
-        preview=(preview+1)%4;
+        preview=NextPreview(preview);
         audio::StopAll();
         if(!audio::Available(static_cast<audio::Cue>(preview))) {
-            Speak(L"That cue is missing or invalid. Check the navigation audio files.");previewPending=false;
+            Speak(L"That cue is missing or invalid. Check the audio files.");previewPending=false;
         } else {
             Speak(PreviewName(preview));previewAt=now+700;previewPending=true;
         }
@@ -153,13 +153,14 @@ void Pump(bool foreground, bool readableMenu) {
     // Preview is explicit, never automatic, and is the only audio allowed in menus.
     if(previewPending) {
         if(now>=previewAt) {
-            audio::SetEnabled(true);audio::Play(static_cast<audio::Cue>(preview),0,1);previewPending=false;
-            nextObstacle=nextBeacon=previewUntil=now+700;
+            if(!audio::Preview(static_cast<audio::Cue>(preview)))Speak(L"Sound preview is unavailable.");
+            previewPending=false;nextObstacle=nextBeacon=now+700;
         }
         return;
     }
-    if(now<previewUntil) return;
-    if(!active) { if(now>=previewAt+700) audio::SetEnabled(false);return; }
+    if(audio::PreviewPlaying())return;
+    audio::CancelPreview();
+    if(!active) {audio::SetEnabled(false);return;}
     if(pressed[4]) Speak(L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. Control Home repeats the latest prompt. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. On a controller: D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face. Native Y, X, B and A keep their announced actions. F2 toggles obstacle cues; F3 previews sounds. Hold the left stick and press D pad down for obstacle cues, up for help, left for sound previews, or right to repeat the latest prompt. Beacons give direction, not a safe route. R remains rewind.");
     if(pressed[5]) {
         obstacles=!obstacles;

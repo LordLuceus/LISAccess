@@ -2,7 +2,7 @@
 #include <Windows.h>
 
 namespace lis::audio {
-enum class Cue { Obstacle, Person, Object, Destination, RewindApproach, RewindCrossed };
+enum class Cue { Obstacle, Person, Object, Destination, RewindApproach, RewindCrossed, Count };
 // All calls must be serialized on the runtime worker, never DllMain.
 // Loads <module directory>/LISAccess/audio/{obstacle,person,object,destination}.wav.
 // Also prepares rewind defaults (independent of navigation WAV availability).
@@ -21,6 +21,11 @@ void SetEnabled(bool enabled);
 void SetRewindEnabled(bool enabled);
 // Disables and flushes both groups.
 void StopAll();
+// Explicit preview owns only its selected cue, independently of automatic groups.
+// Caller must cancel on focus loss or leaving an allowed preview context.
+bool Preview(Cue kind);
+bool PreviewPlaying();
+void CancelPreview();
 // Nonblocking playback; no queue. Busy cues are dropped. Crossing cancels approach;
 // approach is suppressed while crossing plays.
 // Equal-power stereo left/right only, NOT full 3D. Per-cue gain clamped to [0,1].

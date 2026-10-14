@@ -146,7 +146,8 @@ and obstacle cues inactive. Optional `rewind_approach.wav` and
 the mono PCM16 format and limits described under sound customization below.
 Missing or invalid replacements fall back to the built-in cues. Restart the game
 after changing them. These optional files are user-owned and are not removed by
-the installer. F3 remains a preview of the four navigation sounds only.
+the installer. The existing sound preview cycle includes both rewind cues after
+the four navigation sounds, announced as **Rewind approach** and **Rewind crossing**.
 
 ## Journal and SMS
 
@@ -261,7 +262,7 @@ use; existing saves are not disposable test data.
 | Escape | The game's back/cancel action |
 | R | Repeat the last current menu readout while the mod has readable menu focus |
 | F1 | Read help for readable menu focus, dialogue, or navigation during supported gameplay |
-| F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
+| F3 | Preview the next mod sound in readable menus or supported gameplay (experimental) |
 
 R remains the game's rewind key outside readable menus and object inspection. Native movement bindings
 are not changed. Scanner shortcuts ignore Ctrl and Alt; Shift+Home is the one
@@ -292,7 +293,7 @@ to the camera, not Max's body orientation.
 | F | Request camera facing toward the selected target |
 | Number row 1, 2, 3, 4 | Use the focused object's announced action; equivalents of controller Y, X, B, A |
 | F1 | Read navigation help |
-| F3 | Preview the next sound: obstacle, person, object, destination |
+| F3 | Preview the next sound: obstacle, person, object, destination, rewind approach, rewind crossing |
 
 End is left entirely to the game's diary binding. Action keys never auto-repeat.
 
@@ -311,7 +312,7 @@ menu is active or visible, since it also uses the D-pad.
 | Click the left stick | Face the selected target on button release |
 | Hold left-stick click + D-pad down | Toggle obstacle cues |
 | Hold left-stick click + D-pad up | Read help |
-| Hold left-stick click + D-pad left | Preview the next sound |
+| Hold left-stick click + D-pad left | Preview the next of all six mod sounds |
 | Hold left-stick click + D-pad right | Read the gauge while rewinding; otherwise repeat the latest tutorial/HUD prompt or rewind readout |
 | Y, X, B, A | The game's native actions, announced with their button names |
 
