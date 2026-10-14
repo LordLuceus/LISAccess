@@ -1,5 +1,18 @@
 # LISAccess changelog
 
+## 2026-10-14 — Expanded scanner
+
+- The scanner now lists active, eligible interactions across the loaded areas,
+  nearest first, instead of dropping distant objects or stopping at 32 entries.
+  Adjacent rooms can appear; this is not a room filter. Normal interaction range
+  and story requirements are unchanged.
+- Objects with matching names receive letters, such as Photo, A and Photo, B.
+  Moving closer changes their order, not their letters. The selected object
+  remains selected as the list reorders.
+- Scanner readouts finish with their position in the list, such as “2 of 71,”
+  after action information, direction, distance and elevation. Focus and camera
+  announcements use the same disambiguated names.
+
 ## 2026-10-13 — Dialogue choices
 
 - Added automatic reading of the answers actually offered, with keyboard numbers

@@ -211,11 +211,25 @@ keys/buttons before acting.** Selecting a scanner entry does not itself change
 the game's focus. Action shortcuts and native face buttons refer to that focus,
 not an unfocused scanner selection. Original mouse interactions still work.
 
-The scanner uses the game's labels and native story, inventory, one-shot and
-angle checks. Angle-restricted targets are identified so you can try another
-approach. It lists up to 32 qualifying nearby interactions plus configured
-landmarks, prioritizing the actual focused object. This is not a complete room
-description or cast list; occluded objects may still need a different approach.
+The scanner lists all active, qualifying registered interactions in the loaded
+areas, plus configured landmarks, nearest first. The previous proximity cutoff
+and 32-interaction limit are removed. Distance ordering uses ground distance;
+height is described separately. The list can include adjacent rooms: this is not
+a current-room filter, a route finder, or a list of every decorative object.
+
+Matching names receive letters, such as **Photo, A** and **Photo, B**. Letters
+follow object identity rather than distance, so walking past two photos does not
+swap their names. They can change when the duplicate group changes or a scene
+reloads; a unique name has no letter. Selection stays on the same object when
+distance order changes. Focus announcements and camera-facing feedback use the
+same labelled name. Selecting or rereading a scanner entry ends with **N of M**,
+after its action information, direction, distance and elevation.
+
+The game's labels and native story, inventory, one-shot and angle checks still
+apply. Angle-restricted targets are identified so you can try another approach.
+Listing a distant object does **not** extend interaction reach: move close enough
+and wait for its real focused-object announcement and available actions. Occluded
+objects may still need a different approach.
 Some characters can use the generic object sound when their data does not
 identify a character name.
 

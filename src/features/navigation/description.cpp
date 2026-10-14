@@ -1,5 +1,6 @@
 #include "features/navigation/description.h"
 #include "features/navigation/math.h"
+#include <algorithm>
 #include <cmath>
 
 namespace lis::navigation::detail {
@@ -11,14 +12,24 @@ float Bearing(const world::Snapshot& s, const world::Target& t) {
 }
 std::wstring Describe(const world::Snapshot& s, const world::Target& t) {
     const float distance=Distance(s,t);
-    std::wstring text=t.label+L", "+navmath::Direction(Bearing(s,t))+L", "+navmath::Distance(distance,s.radius);
-    if(t.position.z-s.player.z > s.halfHeight*2) text+=L", above";
-    else if(s.player.z-t.position.z > s.halfHeight*2) text+=L", below";
+    std::wstring text=t.label;
+    auto append=[&](const std::wstring& part){
+        if(part.empty())return;
+        if(!text.empty())text+=text.back()==L'.'?L" ":L". ";
+        text+=part;
+    };
     if(t.kind!=world::Kind::Destination) {
-        if(t.stableId==s.focusedId){text+=L". Focused";const auto actions=ActionText(s);if(!actions.empty())text+=L". "+actions;}
-        else text+=L". Not focused. Face this target before choosing an action.";
-        if(t.angleRestricted)text+=L" Try facing or approaching it from another direction.";
+        if(t.stableId==s.focusedId){append(L"Focused");append(ActionText(s));}
+        else append(L"Not focused. Face this target before choosing an action.");
+        if(t.angleRestricted)append(L"Try facing or approaching it from another direction.");
     }
+    std::wstring position=std::wstring(navmath::Direction(Bearing(s,t)))+L", "+navmath::Distance(distance,s.radius);
+    if(t.position.z-s.player.z > s.halfHeight*2)position+=L", above";
+    else if(s.player.z-t.position.z > s.halfHeight*2)position+=L", below";
+    append(position);
+    const auto found=std::find_if(s.targets.begin(),s.targets.end(),[&](const auto& item){return item.stableId==t.stableId;});
+    if(found!=s.targets.end())append(std::to_wstring(found-s.targets.begin()+1)+L" of "+std::to_wstring(s.targets.size()));
+    if(!text.empty()&&text.back()!=L'.')text+=L'.';
     return text;
 }
 audio::Cue CueFor(world::Kind kind) {

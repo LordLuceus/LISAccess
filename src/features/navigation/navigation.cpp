@@ -165,7 +165,8 @@ void Pump(bool foreground, bool readableMenu) {
         else Speak(obstacles ? L"Obstacle cues on. They do not guarantee a safe path." : L"Obstacle cues off.");
         nextObstacle=0;warnedIncomplete=false;
     }
-    std::sort(s.targets.begin(),s.targets.end(),[&](const auto& a,const auto& b){return Distance(s,a)<Distance(s,b);});
+    // Sample already provides the distance-sorted, disambiguated list. Selection
+    // follows stableId across reordering rather than following the old index.
     auto current=std::find_if(s.targets.begin(),s.targets.end(),[&](const auto& t){return t.stableId==selected;});
     if(!selected.empty() && current==s.targets.end()) {
         selected.clear();if(beacon) Speak(L"Target is no longer available. Beacon off.");beacon=false;

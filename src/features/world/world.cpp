@@ -1,4 +1,5 @@
 #include "features/world/session.h"
+#include "features/world/target_list.h"
 #include "features/interactions/scanner.h"
 #include "platform/log.h"
 #include "platform/foreground.h"
@@ -33,12 +34,13 @@ static bool SampleImpl(Session& session,Snapshot& s) {
     }
     s.interactionsFailed=session.interactionFaulted;
     if(session.interactionFaulted)s.interactionStatus="fault_disabled";
+    PrepareTargets(s);
     static std::string lastInteractionState;
     const std::string state=s.interactionStatus+" targets="+std::to_string(s.targets.size()-authored)+" focused="+std::to_string(!s.focusedId.empty());
     if(state!=lastInteractionState){Log("event=interaction_scan status="+state);lastInteractionState=state;}
     s.active = true;
     s.reason = "calibrated local geometry";
-    s.diagnostics = "queries=" + std::to_string(queries) + "; floor=positive; units=engine; partial body sweeps, not a clear route; drop=no support within bounded ray; interactions=native registered near-zone eligible actors";
+    s.diagnostics = "queries=" + std::to_string(queries) + "; floor=positive; units=engine; partial body sweeps, not a clear route; drop=no support within bounded ray; interactions=all loaded registered eligible actors; room_filter=none";
     return true;
 }
 bool SafeSample(Session& session,Snapshot& s) {

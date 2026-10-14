@@ -50,7 +50,7 @@ int EligibleState(Session& session,uintptr_t actor) {
     return best;
 }
 void Interactions(Session& session,Snapshot& s) {
-    uintptr_t input=0,component=0,current=0;Array actors{};float radius=0;
+    uintptr_t input=0,component=0,current=0;Array actors{};
     if(session.reflection.Value(session.liveController,"WhatIfController","ExInput","ObjectProperty",input)&&session.reflection.registry.Instance(input)) {
         s.gamepad=session.reflection.BoolIsSet(input,"WhatIfInput","bPlayingWithGamepad");
         session.reflection.Value(input,"WhatIfInput","ActiveControllerId","IntProperty",s.controllerIndex);
@@ -60,8 +60,7 @@ void Interactions(Session& session,Snapshot& s) {
     s.interactionStatus="state_unavailable";
     if(!session.reflection.Value(component,"DNEWhatIfInteractionComponent","RegisteredActors","ArrayProperty",actors)||!ValidArray(actors,2048) ||
         !session.reflection.Value(component,"DNEWhatIfInteractionComponent","CurrentInteraction","ObjectProperty",current) ||
-        !session.reflection.Value(component,"DNEWhatIfInteractionComponent","ActorInteractionFocused","ObjectProperty",session.liveFocus) ||
-        !session.reflection.Value(component,"DNEWhatIfInteractionComponent","FarZoneRadius","FloatProperty",radius)||!std::isfinite(radius)||radius<=0||radius>10000)return;
+        !session.reflection.Value(component,"DNEWhatIfInteractionComponent","ActorInteractionFocused","ObjectProperty",session.liveFocus))return;
     s.interactionBusy=current!=0;
     if(s.interactionBusy){s.interactionStatus="busy";session.liveFocus=0;return;}
     s.interactionStatus="schema_unavailable";
@@ -70,30 +69,19 @@ void Interactions(Session& session,Snapshot& s) {
     if(!session.reflection.Field("WhatIfInteractionActor","ObjectName","NameProperty",8)||!actionsProperty ||
         !session.reflection.registry.Registered(inner)||session.reflection.registry.ClassOf(inner)!="StructProperty"||Read<int>(inner+0x44)!=0x138)return;
     s.interactionStatus="ready";
-    std::vector<std::pair<float,uintptr_t>> nearby;
+    // Listing has no interaction-distance cutoff. Actual action dispatch still
+    // requires the game's real focus, open UI and freshly available action.
     for(int i=0;i<actors.count;++i) {
         uintptr_t actor=Read<uintptr_t>(actors.data+i*4);Vec3 position{};
         if(!session.reflection.registry.Instance(actor)||!session.reflection.registry.IsA(actor,"WhatIfInteractionActor")||Read<uintptr_t>(actor+0xd8)!=session.liveWorld ||
             !session.reflection.ClearBool(actor,"Actor","bDeleteMe")||!session.reflection.BoolIsSet(actor,"WhatIfInteractionActor","bIsInteractionActive") ||
             !Copy(&position,actor+0x54,sizeof(position))||!Finite(position))continue;
-        const float distance=Length(Sub(position,s.player));
-        if(distance<=radius||actor==session.liveFocus)nearby.emplace_back(distance,actor);
-    }
-    std::sort(nearby.begin(),nearby.end());
-    // Never lose the real focus behind nearer, condition-ineligible objects.
-    auto focused=std::find_if(nearby.begin(),nearby.end(),[&](const auto& item){return item.second==session.liveFocus;});
-    if(focused!=nearby.end())std::rotate(nearby.begin(),focused,focused+1);
-    unsigned eligibleCount=0;
-    for(const auto& candidate:nearby) {
-        if(eligibleCount>=32)break;
-        const uintptr_t actor=candidate.second;
         const int eligibility=EligibleState(session,actor);
         if(!eligibility)continue;
         const std::wstring raw=interaction::ReadObjectLabel(std::cref(session.reflection),[&](uint32_t index){return engine::WideName(session.reflection.registry,index);},actor);
         if(raw.empty())continue;
-        Target target;target.stableId=session.reflection.registry.Path(actor);target.label=session.localization.Translate(session.reflection.registry,session.base,session.localize,session.liveController,raw);target.angleRestricted=eligibility==1;Copy(&target.position,actor+0x54,sizeof(target.position));
+        Target target;target.stableId=session.reflection.registry.Path(actor);target.label=session.localization.Translate(session.reflection.registry,session.base,session.localize,session.liveController,raw);target.angleRestricted=eligibility==1;target.position=position;
         if(target.stableId.empty())continue;
-        ++eligibleCount;
         uintptr_t object=0;
         // This game also represents NPCs as SkeletalMeshActorMAT, not Pawns.
         // Its authored Chara localization namespace identifies those names in
