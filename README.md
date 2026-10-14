@@ -121,7 +121,9 @@ The game still decides which tabs, pages and contacts are available.
 
 Journal and character pages start at their first readable text item, reading the
 left page top-to-bottom before the right page. This includes the earlier, prequel
-journal pages. SMS opens
+journal pages. The diary page number is announced when entering or changing pages,
+not on each paragraph or repeat. Paragraph/item position remains available on each
+readout. SMS opens
 at the latest completed message. Contacts include the game's unread count;
 messages identify their sender and include a displayed date when available.
 New completed replies are announced once. A reply still being typed is not read

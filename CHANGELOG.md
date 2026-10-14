@@ -7,6 +7,8 @@
   at the latest completed message and does not read replies still being typed.
   Earlier prequel pages are included. Journal and character text follows book
   reading order, rather than placing later paragraphs before their introductions.
+  Diary page numbers are announced on page entry/change, not on every paragraph
+  or repeat; paragraph/item positions remain part of those readouts.
 - Added Ctrl+Left/Right for diary tabs, Up/Down for text items and message history,
   and R to repeat. Controller reading uses D-pad Up/Down and left-stick click;
   right-stick click reads help. The game's page, contact and back controls remain.

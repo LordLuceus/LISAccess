@@ -21,7 +21,7 @@ struct Cursor {
         if(index<0||index>=static_cast<int>(p.items.size()))return Join(p.title,L"No readable text on this page.");
         const int at=p.nativeIndex>=0?p.nativeIndex:index;
         const int count=p.nativeCount>0?p.nativeCount:static_cast<int>(p.items.size());
-        return Join(Join(p.items[index].text,std::to_wstring(at+1)+L" of "+std::to_wstring(count)+L"."),p.position);
+        return Join(p.items[index].text,std::to_wstring(at+1)+L" of "+std::to_wstring(count)+L".");
     }
     std::wstring Update(const Page& p,const std::string& identity) {
         if(!p.ready)return {};
@@ -29,7 +29,7 @@ struct Cursor {
             Reset();context=identity;
             Select(p,p.selected>=0&&p.selected<static_cast<int>(p.items.size())?p.selected:p.items.empty()?-1:0);
             for(const auto& item:p.items)seen.insert(item.id);
-            return p.items.empty()?Describe(p):Join(p.title,Describe(p));
+            return Join(p.items.empty()?Describe(p):Join(p.title,Describe(p)),p.position);
         }
         const auto found=std::find_if(p.items.begin(),p.items.end(),[&](const auto& item){return item.id==selected;});
         const auto oldSelected=selected;

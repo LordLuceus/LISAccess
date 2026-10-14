@@ -38,6 +38,16 @@ int main() {
     check(pad.Update(0x80,true,true,1800)==4,"right stick click helps");
     check(pad.Update(2,false,true,1900)==0&&pad.Update(2,true,true,2000)==0,"inactive context drops and re-primes held input");
     check(pad.Update(2,true,false,2100)==0,"disconnection cannot move cursor");
+    Page numbered;numbered.ready=true;numbered.kind=View::Journal;numbered.title=L"Journal";
+    numbered.position=L"Page 3 of 8";numbered.selected=0;numbered.items={{"first",L"First paragraph."},{"second",L"Second paragraph."}};
+    Cursor pages;
+    check(pages.Update(numbered,"day0:page2").find(L"Page 3 of 8")!=std::wstring::npos,"journal entry announces page number");
+    auto paragraph=pages.Move(numbered,1);
+    check(paragraph.find(L"Page 3 of 8")==std::wstring::npos&&paragraph.find(L"2 of 2.")!=std::wstring::npos,"paragraph navigation retains item count without repeating page number");
+    check(pages.Describe(numbered).find(L"Page 3 of 8")==std::wstring::npos,"reread omits page number");
+    check(pages.Update(numbered,"day0:page2").empty(),"unchanged page does not repeat number");
+    numbered.position=L"Page 4 of 8";
+    check(pages.Update(numbered,"day0:page3").find(L"Page 4 of 8")!=std::wstring::npos,"page change announces new page number");
     cursor.Reset();check(cursor.context.empty()&&cursor.selected.empty()&&cursor.seen.empty(),"closing drops stale page and message history");
     return errors?1:0;
 }

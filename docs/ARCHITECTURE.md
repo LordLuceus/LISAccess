@@ -95,6 +95,8 @@ The dirty-padding regression uses the reflected24-byte layout, not zero-filled
 synthetic scalar results. Native tab switching passed the user's retest; the
 successful trace did not contain dirty padding, so it does not establish that
 padding caused every earlier failure.
+Page numbering is appended only to the page-entry announcement, not the shared
+paragraph/repeat description.
 The reading cursor is deliberately
 separate from pixel scrolling. Source-derived tests and stubbed lifecycle tests
 do not certify the live native binding or its visual-scroll behaviour.
