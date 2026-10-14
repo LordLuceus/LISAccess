@@ -1,4 +1,5 @@
 #include "features/world/session.h"
+#include "features/exits/exits.h"
 #include "platform/log.h"
 #include "platform/foreground.h"
 #include "engine/abi.h"
@@ -20,6 +21,7 @@ void Add(std::vector<uintptr_t>& v, uintptr_t p) {
 bool Discover(Session& session) {
     Array a{};
     if (!session.reflection.registry.Registry(a) || session.reflection.registry.Name(0) != "None" || session.reflection.registry.Name(2) != "IntProperty") return false;
+    if(session.cursor==0)session.pendingExitAnnouncements.clear();
     // Hard per-tick discovery bound. Initial sampling waits for a complete registry pass.
     int end = (std::min)(a.count, session.cursor + 8192);
     for (; session.cursor < end; ++session.cursor) {
@@ -31,6 +33,10 @@ bool Discover(Session& session) {
         if (cls == "Function" && name == "Localize" && session.reflection.registry.NameOf(Read<uintptr_t>(p + 0x28)) == "Object") session.localize = p;
         if (cls == "Function" && name == "SetNextCameraRotationForced" && session.reflection.registry.NameOf(Read<uintptr_t>(p + 0x28)) == "CBA_3RD_Basic") session.faceFunction = p;
         if (!session.reflection.registry.Instance(p)) continue;
+        if(cls=="IA_GFxUIControlAnnouncement"&&!session.exitFaulted&&exits::IsSource(session,p)) {
+            if(session.pendingExitAnnouncements.size()<4096)session.pendingExitAnnouncements.push_back(p);
+            else {session.exitFaulted=true;Log("event=exit_scan_fault reason=discovery_bound interactions=preserved");}
+        }
         if (cls == "WhatIfController") Add(session.controllers, p);
         if (cls == "PauseMenu" || cls == "OutGameSensenMenu") Add(session.menus, p);
         std::string shortName=name;
@@ -42,7 +48,10 @@ bool Discover(Session& session) {
             if(EqualPath(shortName,targetName) && session.reflection.registry.IsA(p,"Actor") && EqualPath(session.reflection.registry.Path(p),landmark.actorPath)) Add(session.destinations,p);
         }
     }
-    if (session.cursor == a.count) { session.cursor = 0; session.ready = true; }
+    if (session.cursor == a.count) {
+        session.exitAnnouncements.swap(session.pendingExitAnnouncements);
+        session.cursor = 0; session.ready = true;
+    }
     return session.ready;
 }
 }

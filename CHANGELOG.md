@@ -1,5 +1,15 @@
 # LISAccess changelog
 
+## 2026-10-14 — Exit areas in the scanner
+
+- Added active scripted exit areas, including the hallway exit to the main campus,
+  to the scanner. They use the game's destination labels and are identified as
+  “Exit area.” Facing and the destination beacon guide you toward the actual area,
+  rather than requiring you to stumble across its prompt.
+- Enter the area and use the game's exit prompt. This does not activate an exit
+  from a distance or bypass story requirements; numbered object-action shortcuts
+  still apply to the game's focused interaction, not to exit areas.
+
 ## 2026-10-14 — Scripted dialogue choices
 
 - Added reading and numbered keyboard selection for scripted decisions, including

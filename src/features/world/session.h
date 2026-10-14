@@ -10,11 +10,12 @@ inline constexpr float Pi=3.14159265358979323846f;
 struct Session {
     uintptr_t base=0,trace=0,localize=0,liveController=0,liveWorld=0,liveFocus=0,faceFunction=0;
     DWORD thread=0;
-    bool faulted=false,ready=false,interactionFaulted=false,faceFaulted=false;
+    bool faulted=false,ready=false,interactionFaulted=false,faceFaulted=false,exitFaulted=false;
     int cursor=0;
     engine::Reflection reflection;
     engine::Localization localization;
     std::vector<uintptr_t> controllers,menus,destinations;
+    std::vector<uintptr_t> exitAnnouncements,pendingExitAnnouncements;
     std::vector<Landmark> landmarks;
     std::string lastState;
 };

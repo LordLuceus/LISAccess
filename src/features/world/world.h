@@ -5,7 +5,8 @@
 
 namespace lis::world {
 struct Vec3 { float x = 0, y = 0, z = 0; };
-enum class Kind { Object, Person, Destination };
+enum class Kind { Object, Person, Destination, Exit };
+inline bool NeedsInteractionFocus(Kind kind) {return kind==Kind::Object||kind==Kind::Person;}
 struct Target { std::string stableId; std::wstring label; Vec3 position; Kind kind = Kind::Object; bool angleRestricted=false; };
 struct Action { std::wstring label; };
 struct Landmark { std::string actorPath; std::wstring label; };
@@ -22,6 +23,7 @@ struct Snapshot {
     bool gamepad = false;
     bool interactionBusy = false;
     bool interactionsFailed = false;
+    bool exitsFailed = false;
     std::string interactionStatus = "unavailable";
     int controllerIndex = -1;
     std::array<Probe, 3> probes{};

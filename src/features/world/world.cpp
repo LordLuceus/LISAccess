@@ -1,6 +1,7 @@
 #include "features/world/session.h"
 #include "features/world/target_list.h"
 #include "features/interactions/scanner.h"
+#include "features/exits/exits.h"
 #include "platform/log.h"
 #include "platform/foreground.h"
 #include "engine/abi.h"
@@ -34,9 +35,16 @@ static bool SampleImpl(Session& session,Snapshot& s) {
     }
     s.interactionsFailed=session.interactionFaulted;
     if(session.interactionFaulted)s.interactionStatus="fault_disabled";
+    const size_t beforeExits=s.targets.size();
+    if(!session.exitFaulted&&!exits::Sample(session,s)) {
+        s.targets.resize(beforeExits);
+        Log("event=exit_scan_fault status=disabled interactions=preserved");
+    }
+    s.exitsFailed=session.exitFaulted;
+    const size_t exits=s.targets.size()-beforeExits;
     PrepareTargets(s);
     static std::string lastInteractionState;
-    const std::string state=s.interactionStatus+" targets="+std::to_string(s.targets.size()-authored)+" focused="+std::to_string(!s.focusedId.empty());
+    const std::string state=s.interactionStatus+" targets="+std::to_string(s.targets.size()-authored)+" exits="+std::to_string(exits)+" focused="+std::to_string(!s.focusedId.empty());
     if(state!=lastInteractionState){Log("event=interaction_scan status="+state);lastInteractionState=state;}
     s.active = true;
     s.reason = "calibrated local geometry";
@@ -56,6 +64,7 @@ void Reset() {
     auto& session=GameSession();
     if (session.thread && session.thread != GetCurrentThreadId()) return;
     session.reflection.Reset(); session.controllers.clear(); session.menus.clear(); session.destinations.clear();
+    session.exitAnnouncements.clear();session.pendingExitAnnouncements.clear();
     session.cursor = 0; session.ready = false; session.trace = 0; session.lastState.clear();
     // A native fault remains latched for this DLL lifetime; menu sampling is independent.
 }

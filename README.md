@@ -218,7 +218,8 @@ the game's focus. Action shortcuts and native face buttons refer to that focus,
 not an unfocused scanner selection. Original mouse interactions still work.
 
 The scanner lists all active, qualifying registered interactions in the loaded
-areas, plus configured landmarks, nearest first. The previous proximity cutoff
+areas, active scripted exit areas and configured landmarks, nearest first. The
+previous proximity cutoff
 and 32-interaction limit are removed. Distance ordering uses ground distance;
 height is described separately. The list can include adjacent rooms: this is not
 a current-room filter, a route finder, or a list of every decorative object.
@@ -238,6 +239,21 @@ and wait for its real focused-object announcement and available actions. Occlude
 objects may still need a different approach.
 Some characters can use the generic object sound when their data does not
 identify a character name.
+
+Entries announced as **Exit area** are scripted loading-zone triggers, such as
+the hallway exit to the main campus. Use the same facing and beacon controls to
+approach their area; the beacon uses the destination sound. These entries do not
+need an ordinary focused-object announcement. Enter the area and follow the
+game's prompt to leave. For the campus exit, this is normally left mouse button
+on keyboard/mouse, or A on a controller; follow the prompt if bindings differ.
+Numbered object-action shortcuts
+do **not** activate exit areas; they still refer to the focused ordinary object.
+
+An exit-area entry is a destination, not a promise that the story currently lets
+you leave. The game's requirements, nearby-interaction priority and cinematic or
+rewind restrictions still apply. This supports the game's loading-zone trigger
+behaviour; it is not a guarantee that every later scene transition uses that
+behaviour. The hallway exit to the main campus has passed its in-game playtest.
 
 Facing supports the normal basic camera and clamps requests to its authored
 pitch bounds. Fixed, dialogue, derived or multiple-active-behaviour camera modes

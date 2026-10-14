@@ -18,11 +18,12 @@ std::wstring Describe(const world::Snapshot& s, const world::Target& t) {
         if(!text.empty())text+=text.back()==L'.'?L" ":L". ";
         text+=part;
     };
-    if(t.kind!=world::Kind::Destination) {
+    if(world::NeedsInteractionFocus(t.kind)) {
         if(t.stableId==s.focusedId){append(L"Focused");append(ActionText(s));}
         else append(L"Not focused. Face this target before choosing an action.");
         if(t.angleRestricted)append(L"Try facing or approaching it from another direction.");
     }
+    if(t.kind==world::Kind::Exit)append(L"Exit area");
     std::wstring position=std::wstring(navmath::Direction(Bearing(s,t)))+L", "+navmath::Distance(distance,s.radius);
     if(t.position.z-s.player.z > s.halfHeight*2)position+=L", above";
     else if(s.player.z-t.position.z > s.halfHeight*2)position+=L", below";
@@ -34,7 +35,7 @@ std::wstring Describe(const world::Snapshot& s, const world::Target& t) {
 }
 audio::Cue CueFor(world::Kind kind) {
     if(kind==world::Kind::Person) return audio::Cue::Person;
-    if(kind==world::Kind::Destination) return audio::Cue::Destination;
+    if(kind==world::Kind::Destination||kind==world::Kind::Exit) return audio::Cue::Destination;
     return audio::Cue::Object;
 }
 const wchar_t* PreviewName(int i) {

@@ -26,7 +26,7 @@ ULONGLONG stamp = 0;
 std::vector<world::Landmark> landmarks;
 bool configured = false, audioReady = false, obstacles = false, beacon = false;
 bool wasActive = false, diagnostics = false, previewPending = false, warnedIncomplete = false;
-bool warnedInteractions=false;
+bool warnedInteractions=false,warnedExits=false;
 int preview = -1;
 ULONGLONG nextObstacle = 0, nextBeacon = 0, previewAt = 0, previewUntil = 0, logAt = 0;
 std::string selected;
@@ -109,6 +109,7 @@ void Pump(bool foreground, bool readableMenu) {
     }
     if(foreground&&!readableMenu&&pressed[static_cast<size_t>(input::Command::RepeatPrompt)])prompts::RequestRepeat();
     if(foreground&&s.interactionsFailed&&!warnedInteractions){Speak(L"Interaction scanning failed and has been disabled. Navigation is still available.");warnedInteractions=true;}
+    if(foreground&&s.exitsFailed&&!warnedExits){Speak(L"Exit-area scanning failed and has been disabled. Other scanner targets remain available.");warnedExits=true;}
     if(!foreground || (!active && !readableMenu)) {
         audio::SetEnabled(false);previewPending=false;
         if(wasActive) beacon=false;
@@ -189,7 +190,7 @@ void Pump(bool foreground, bool readableMenu) {
     if(pressed[7]) {
         if(current==s.targets.end())Speak(L"No target selected. Select one first.");
         else {
-            if(current->kind!=world::Kind::Destination&&current->stableId!=s.focusedId){aimingAt=current->stableId;aimDeadline=now+1500;}
+            if(world::NeedsInteractionFocus(current->kind)&&current->stableId!=s.focusedId){aimingAt=current->stableId;aimDeadline=now+1500;}
             std::lock_guard<std::mutex> lock(mutex);pendingAction=-1;pendingFocus.clear();pendingFace=current->stableId;
         }
     }

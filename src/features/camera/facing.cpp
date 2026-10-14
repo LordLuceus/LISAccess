@@ -70,7 +70,7 @@ std::wstring FaceTarget(const std::string& expectedTarget,bool& submitted) {
     const int pitch=static_cast<int>(std::lround(std::atan2(delta.z,std::hypot(delta.x,delta.y))*units));
     Rotator wanted=gameRotation;
     wanted.yaw=SignedRotation(SignedRotation(gameRotation.yaw)+SignedRotation(yaw-SignedRotation(viewRotation.yaw)));
-    if(target->kind!=Kind::Destination)
+    if(NeedsInteractionFocus(target->kind))
         wanted.pitch=std::clamp(SignedRotation(gameRotation.pitch)+SignedRotation(pitch-SignedRotation(viewRotation.pitch)),minimum,maximum);
     if(!RequestCameraRotation(session,behaviour,wanted))return L"The camera request failed.";
     submitted=true;
