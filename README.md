@@ -27,7 +27,8 @@ distributed only as functional cues bundled with complete mod release archives,
 not as a standalone sound pack. Raw provider PCM files remain private and are
 never included in releases. Release archives must include the MIT licence,
 third-party notices and audio restrictions; the MIT licence grants no independent
-reuse rights to the sounds.
+reuse rights to those generated navigation sounds. The two short rewind-marker
+cues are synthesized by the mod's own MIT-licensed code, not ElevenLabs assets.
 
 ## What it does
 
@@ -83,7 +84,8 @@ captions on animated tutorial panels. Timed startup slides and popups use their
 actual composed text rather than a fixed English substitute. Startup readouts
 queue so the next slide or automatic title message does not cut them short;
 explicit reread and subsequent menu navigation still interrupt. During
-gameplay, **Ctrl+Home** repeats the latest captured prompt, even after it fades.
+gameplay, **Ctrl+Home** repeats the latest captured prompt or rewind readout, even
+after it fades.
 During dialogue it repeats the currently available choices instead.
 On a controller, hold the left-stick click and press **D-pad right**. These repeat
 commands do not select or dismiss a prompt. **R remains rewind in gameplay**;
@@ -109,6 +111,42 @@ animated-tutorial captions, plus composed menu popups and startup slides—not t
 baked into videos or images. This prompt reader does not add subtitles,
 nor announcements for the autosave icon itself. Startup narration and the photo
 and selfie tutorials have been playtested successfully.
+
+## Rewind gauge and last-action mark
+
+While rewinding, a **short double tick** warns when you are within five percent
+of the gauge's full range of the starting last-action mark. A **short falling
+cue** means you reached or passed that mark. Each cue sounds once per rewind;
+there is no continuous progress tone and the mod does not stop rewind for you.
+
+When rewind stops, the mod reads the gauge percentage and your relation to the
+mark. Lower percentages mean an earlier position on the game's gauge, not a
+percentage of the chapter or a count of seconds holding the button. The mark
+tracked for this feedback is the one available at the start of that rewind:
+undoing an action can move the game's marker, but will not silently move this
+warning to a different action. The mark has no conversation title; this does
+not establish that every conversation has a separate mark.
+
+While rewinding, **Home or D-pad up** reads the current position, and the normal
+prompt-repeat command reads it too. Afterward, **Ctrl+Home**, or **hold left-stick
+click and press D-pad right**, repeats the latest readout until another prompt
+replaces it. Dialogue choices still take priority over prompt repeat. Outside
+rewind, Home and D-pad up keep their normal scanner behavior.
+
+Feedback stops in menus, on focus loss, or when its data becomes stale. If cue
+playback fails, a brief spoken warning takes its place. Missing position or marker
+data is reported as unavailable rather than guessed. These cues are advisory:
+fast rewind can cross the warning band between samples, so the boundary cue can
+occur without an approach cue. **This does not guarantee against overshooting.**
+Native gauge acquisition, marker cues and readouts have passed their in-game playtest.
+
+The cues share `Volume` in `LISAccess\navigation.ini` but work even with navigation
+and obstacle cues inactive. Optional `rewind_approach.wav` and
+`rewind_crossed.wav` in `LISAccess\audio` replace the synthesized defaults; use
+the mono PCM16 format and limits described under sound customization below.
+Missing or invalid replacements fall back to the built-in cues. Restart the game
+after changing them. These optional files are user-owned and are not removed by
+the installer. F3 remains a preview of the four navigation sounds only.
 
 ## Journal and SMS
 
@@ -248,9 +286,9 @@ to the camera, not Max's body orientation.
 |---|---|
 | F2 | Toggle obstacle proximity cues; initially off |
 | Page Down / Page Up | Select next / previous scanner target; hold to repeat |
-| Home | Describe the selected target; with no selection, repeat focused-object actions |
+| Home | Read the gauge while rewinding; otherwise describe the selected target or focused-object actions |
 | Shift+Home | Toggle the selected target's directional beacon |
-| Ctrl+Home | Repeat the latest tutorial/HUD prompt, including after it fades |
+| Ctrl+Home | Read the gauge while rewinding; otherwise repeat the latest tutorial/HUD prompt or rewind readout |
 | F | Request camera facing toward the selected target |
 | Number row 1, 2, 3, 4 | Use the focused object's announced action; equivalents of controller Y, X, B, A |
 | F1 | Read navigation help |
@@ -268,13 +306,13 @@ menu is active or visible, since it also uses the D-pad.
 | Controller input | Gameplay action |
 |---|---|
 | D-pad left / right | Previous / next scanner target; hold to repeat |
-| D-pad up | Describe the selected target or focused-object actions |
+| D-pad up | Read the gauge while rewinding; otherwise describe the selected target or focused-object actions |
 | D-pad down | Toggle the selected target's beacon |
 | Click the left stick | Face the selected target on button release |
 | Hold left-stick click + D-pad down | Toggle obstacle cues |
 | Hold left-stick click + D-pad up | Read help |
 | Hold left-stick click + D-pad left | Preview the next sound |
-| Hold left-stick click + D-pad right | Repeat the latest tutorial/HUD prompt, including after it fades |
+| Hold left-stick click + D-pad right | Read the gauge while rewinding; otherwise repeat the latest tutorial/HUD prompt or rewind readout |
 | Y, X, B, A | The game's native actions, announced with their button names |
 
 A left-stick chord does not also trigger facing on release. Native face buttons
@@ -367,7 +405,8 @@ rather than claiming that no targets exist.
 ### Sound and destination customization
 
 The game directory's `Binaries\Win32\LISAccess\navigation.ini` sets default
-obstacle-cue state and `Volume` (0.0 to 1.0). F2 changes the current session only.
+obstacle-cue state and `Volume` (0.0 to 1.0), shared by navigation and rewind cues.
+F2 changes the current session's obstacle cues only; it does not toggle rewind cues.
 Keep `Diagnostics=0` except when collecting a requested development log.
 
 Replace `obstacle.wav`, `person.wav`, `object.wav` or `destination.wav` in

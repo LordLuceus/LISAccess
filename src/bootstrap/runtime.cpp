@@ -8,6 +8,7 @@
 #include "features/prompts/prompts.h"
 #include "features/dialogue/dialogue.h"
 #include "features/journal/journal.h"
+#include "features/rewind/rewind.h"
 #include "platform/foreground.h"
 #include "platform/log.h"
 #include "output/speech.h"
@@ -20,8 +21,11 @@ HWND window = nullptr;
 WNDPROC previousProc = nullptr;
 UINT tickMessage = 0;
 UINT_PTR timer = 0;
+UINT_PTR rewindTimer = 0;
 std::atomic<bool> failed{false};
 std::wstring localDirectory;
+
+void CALLBACK RewindTimerProc(HWND,UINT,UINT_PTR,DWORD){rewind::Tick();}
 
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
     prompts::Tick();
@@ -79,6 +83,8 @@ void RunRuntime(HMODULE module) {
     prompts::Initialize(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
     timer = SetTimer(window, 0x4c4953, 200, TimerProc);
     if (!timer) { Log("event=timer_failed"); Speak(L"Could not start menu inspection."); return; }
+    rewindTimer=SetTimer(window,0x4c4954,50,RewindTimerProc);
+    if(!rewindTimer)Speak(L"Could not start rewind feedback.");
     Log("event=bridge_ready window_thread=" + std::to_string(GetWindowThreadProcessId(window, nullptr)));
     bool faultSpoken = false;
     bool wasForeground = false;
@@ -94,10 +100,13 @@ void RunRuntime(HMODULE module) {
         navigation::Pump(foreground, readableMenu);
         dialogue::Pump(foreground, readableMenu);
         prompts::Pump(foreground,readableMenu);
+        rewind::Pump(foreground,readableMenu);
         wasForeground = foreground;
         Sleep(25);
     }
     KillTimer(window, timer);
+    if(rewindTimer)KillTimer(window,rewindTimer);
+    rewind::Shutdown();
     navigation::Shutdown();
     journal::Shutdown();
     ShutdownPlatform();

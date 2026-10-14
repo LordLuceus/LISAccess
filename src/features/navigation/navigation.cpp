@@ -6,6 +6,7 @@
 #include "features/camera/facing.h"
 #include "features/prompts/prompts.h"
 #include "features/dialogue/dialogue.h"
+#include "features/rewind/rewind.h"
 #include "output/audio_cues.h"
 #include "output/speech.h"
 #include "platform/log.h"
@@ -97,12 +98,12 @@ void Pump(bool foreground, bool readableMenu) {
     if(foreground&&!reply.empty())Speak(reply);
     const bool fresh=at && now-at<=450;
     const bool active=foreground && fresh && s.active && !s.interactionBusy && !readableMenu;
-    const auto padPresses=devices.ReadController(s.controllerIndex,active||(foreground&&!readableMenu&&dialogue::HasContext()),now,foreground&&!readableMenu);
+    const auto padPresses=devices.ReadController(s.controllerIndex,active||(foreground&&!readableMenu&&(dialogue::HasContext()||rewind::HasContext())),now,foreground&&!readableMenu);
     std::optional<bool> commandGamepad;
     if(std::any_of(padPresses.begin(),padPresses.end(),[](bool value){return value;})){s.gamepad=true;commandGamepad=true;}
     else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;})){s.gamepad=false;commandGamepad=false;}
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
-    if(dialogue::HandleInput(pressed,foreground,readableMenu,commandGamepad)) {
+    if(rewind::HandleInput(pressed,foreground,readableMenu,commandGamepad.value_or(false))||dialogue::HandleInput(pressed,foreground,readableMenu,commandGamepad)) {
         audio::SetEnabled(false);previewPending=false;beacon=false;wasActive=false;
         seenFocus.clear();spokenFocus.clear();aimingAt.clear();
         return;

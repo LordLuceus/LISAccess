@@ -215,6 +215,35 @@ or in-game correctness. It does not make a small class well designed by itself.
 
 ## Validation
 
+### Rewind feedback
+
+`features/rewind` samples the real gauge on a separate 50 ms window-thread timer;
+it does not increase collision/scan sampling frequency. It reuses world reflection
+metadata but not the traversal gate. Manager/controller/world identity, pause/menu
+ownership, renderer readiness and the actual RewindBar clip visibility gate output.
+The supported binary's native writer (RVA `0xae5b10`) computes fill from
+`ReferenceTime / (bForceRewindBarVisible ? OverriddenEndTime : RewindEndTime)`;
+the unnamed marker comes from native `LastPlayerAction` pointer +4, NOT a reflected
+payload at +0. Reads are bounded/guarded; invalid denominators are not zero progress.
+
+Pure policy retains the starting marker's copied timestamp across marker replacement,
+warns once within a five-percent band and reports a reached/passed boundary once.
+Recent idle samples can detect a fast first jump; state2 alone never starts rewind
+(scripted choices use it too). State3 defers completion. Loss of context, identity or
+freshness cancels rather than fabricating a stop. Queue age is independent of snapshot
+freshness. A falling boundary cue supersedes an unplayed approach cue. Fast operations
+wholly between samples cannot be guaranteed; there is no game-input injection here.
+
+Worker-side output uses a separate rewind audio group, so navigation disabling itself
+cannot flush marker sounds. Focus/menu loss flushes rewind audio. Both groups share
+the existing volume. Synthesized defaults require no extra installed assets; optional
+valid replacement WAVs are user-owned. Policy, queue lifecycle and PCM generation are
+tested without game/audio output. The native reader, cues and readout have passed
+playtesting; temporary state/event diagnostics have been removed. A completed
+readout is remembered by existing prompt history, not a new key.
+
+### Commands
+
 From the repository root:
 
 ```powershell

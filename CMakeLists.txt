@@ -53,6 +53,8 @@ add_library(lis_features OBJECT
     src/features/menus/menus.cpp
     src/features/prompts/prompts.cpp
     src/features/prompts/control_data.cpp
+    src/features/rewind/native.cpp
+    src/features/rewind/rewind.cpp
     src/features/navigation/collision.cpp
     src/features/navigation/description.cpp
     src/features/navigation/navigation.cpp
@@ -90,6 +92,9 @@ lis_test(narration_test narration tests/narration_test.cpp)
 lis_test(popup_test startup_popup tests/popup_test.cpp)
 lis_test(prompts_test prompt_policy tests/prompts_test.cpp)
 lis_test(controller_prompts_test controller_prompts tests/controller_prompts_test.cpp)
+lis_test(rewind_feedback_test rewind_feedback tests/rewind_feedback_test.cpp)
+lis_test(rewind_audio_test rewind_audio tests/rewind_audio_test.cpp)
+lis_test(rewind_lifecycle_test rewind_lifecycle tests/rewind_lifecycle_test.cpp src/features/rewind/rewind.cpp)
 lis_test(dialogue_test dialogue_policy tests/dialogue_test.cpp)
 lis_test(scripted_choices_test scripted_choices tests/scripted_choices_test.cpp)
 lis_test(dialogue_lifecycle_test dialogue_lifecycle tests/dialogue_lifecycle_test.cpp src/features/dialogue/dialogue.cpp)

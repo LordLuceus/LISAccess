@@ -113,6 +113,7 @@ void Tick() {
     if(!ok){std::lock_guard<std::mutex> lock(mutex);faulted=true;Log("event=prompt_fault status=disabled");}
 }
 void RequestRepeat(){std::lock_guard<std::mutex> lock(mutex);repeat=true;}
+void RememberReadout(const std::wstring& text){std::lock_guard<std::mutex> lock(mutex);history.Remember(text);}
 void Pump(bool foreground,bool readableMenu) {
     std::wstring text;bool interrupt=false;
     {

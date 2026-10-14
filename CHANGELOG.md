@@ -1,5 +1,16 @@
 # LISAccess changelog
 
+## 2026-10-14 — Rewind marker feedback
+
+- Added a short approach cue and a distinct reached/passed cue for the last-action
+  mark that was present when rewind began. When rewind stops, a spoken gauge
+  percentage reports whether that mark was reached or passed. This is feedback,
+  not automatic stopping or a guarantee against overshooting.
+- Home/D-pad up reads the gauge during rewind; the existing prompt-repeat command
+  can repeat the completed readout afterward. Menus and dialogue retain their
+  existing input priority. Rewind sounds work independently of navigation cues,
+  share the existing volume setting, and accept optional replacement WAVs.
+
 ## 2026-10-14 — Controller buttons in tutorial prompts
 
 - Controller tutorial readouts now include recognized button names, such as LT

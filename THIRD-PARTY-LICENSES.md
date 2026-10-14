@@ -145,6 +145,14 @@ independent reuse rights to these sounds; do not redistribute them separately
 without rights permitting that use. This distribution policy does not waive any
 underlying ElevenLabs terms or applicable commercial-plan restrictions.
 
+## Rewind marker audio
+
+The two brief default rewind-marker cues are synthesized by LISAccess's own
+code and are covered by its MIT licence. They are not ElevenLabs outputs and do
+not use the private navigation audio inputs. Optional user-supplied replacement
+WAVs remain subject to their owners' licences; the mod does not grant rights to
+those recordings.
+
 ## Research-only software
 
 Dissect's Apache-2.0 LZO decoder and JPEXS FFDec (GPL-3.0-or-later) were used to

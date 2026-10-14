@@ -6,6 +6,7 @@
 #define _WIN32_WINNT 0x0A00
 #endif
 #include "output/audio_cues.h"
+#include "output/rewind_audio.h"
 #include "platform/log.h"
 #include <xaudio2.h>
 #include <algorithm>
@@ -25,11 +26,12 @@ struct Sound {
 };
 IXAudio2* engine = nullptr;
 IXAudio2MasteringVoice* master = nullptr;
-std::array<Sound, 4> sounds;
-bool enabled = false;
+std::array<Sound, detail::CueCount> sounds;
+detail::GroupGate gate;
 bool comInitialized = false;
-constexpr const wchar_t* names[] = {L"obstacle.wav", L"person.wav", L"object.wav", L"destination.wav"};
-constexpr const char* labels[] = {"obstacle", "person", "object", "destination"};
+constexpr const wchar_t* names[] = {L"obstacle.wav", L"person.wav", L"object.wav", L"destination.wav",
+                                  L"rewind_approach.wav", L"rewind_crossed.wav"};
+constexpr const char* labels[] = {"obstacle", "person", "object", "destination", "rewind_approach", "rewind_crossed"};
 uint16_t U16(const BYTE* p) { return uint16_t(p[0] | (uint16_t(p[1]) << 8)); }
 uint32_t U32(const BYTE* p) { return uint32_t(U16(p)) | (uint32_t(U16(p + 2)) << 16); }
 // Intentionally supports only replaceable mono signed PCM16 RIFF/WAVE, 8-48 kHz,
@@ -80,29 +82,52 @@ bool Load(const std::filesystem::path& path, Sound& sound) {
     sound.data.assign(bytes.begin() + dataOffset, bytes.begin() + dataOffset + dataSize);
     return SUCCEEDED(engine->CreateSourceVoice(&sound.voice, &format, 0, 2.0f));
 }
+bool DefaultRewind(size_t index) {
+    auto& sound = sounds[index];
+    sound.data = detail::RewindPcm(index == static_cast<size_t>(Cue::RewindCrossed));
+    WAVEFORMATEX format{};
+    format.wFormatTag = WAVE_FORMAT_PCM;
+    format.nChannels = 1;
+    format.nSamplesPerSec = detail::RewindSampleRate;
+    format.wBitsPerSample = 16;
+    format.nBlockAlign = 2;
+    format.nAvgBytesPerSec = format.nSamplesPerSec * 2;
+    return SUCCEEDED(engine->CreateSourceVoice(&sound.voice, &format, 0, 2.0f));
+}
+void Flush(size_t begin, size_t end) {
+    for (size_t i = begin; i < end; ++i) if (sounds[i].voice) {
+        sounds[i].voice->Stop(0);
+        sounds[i].voice->FlushSourceBuffers();
+    }
+}
+void SetGroup(bool rewind, bool value) {
+    bool& enabled = rewind ? gate.rewind : gate.navigation;
+    if (enabled == value) return;
+    if (value) {
+        enabled = engine && SUCCEEDED(engine->StartEngine());
+        return;
+    }
+    enabled = false;
+    if (engine) engine->StopEngine();
+    Flush(rewind ? detail::NavigationCount : 0, rewind ? sounds.size() : detail::NavigationCount);
+    if (engine && gate.Any() && FAILED(engine->StartEngine())) StopAll();
+}
 }
 
 void StopAll() {
-    enabled = false;
+    gate.Reset();
     // StopEngine synchronizes with the processing pass; flush cannot leak an old
     // buffer on re-enable. No queued commands or deferred bursts are retained.
     if (engine) engine->StopEngine();
-    for (auto& sound : sounds) if (sound.voice) {
-        sound.voice->Stop(0);
-        sound.voice->FlushSourceBuffers();
-    }
+    Flush(0, sounds.size());
 }
 bool SetMasterGain(float gain) {
     if (!master || !std::isfinite(gain)) return false;
     return SUCCEEDED(master->SetVolume(std::clamp(gain, 0.0f, 1.0f)));
 }
-void SetEnabled(bool value) {
-    if (!value) { enabled = false; StopAll(); return; }
-    if (!engine || enabled) return;
-    enabled = SUCCEEDED(engine->StartEngine());
-}
+void SetEnabled(bool value) { SetGroup(false, value); }
+void SetRewindEnabled(bool value) { SetGroup(true, value); }
 void Shutdown() {
-    enabled = false;
     StopAll();
     for (auto& sound : sounds) {
         if (sound.voice) sound.voice->DestroyVoice();
@@ -132,19 +157,23 @@ bool Initialize(HMODULE module) {
     master->SetVolume(0.20f);
     wchar_t path[32768]{};
     const DWORD count = GetModuleFileNameW(module, path, static_cast<DWORD>(std::size(path)));
-    if (!count || count >= std::size(path)) { Shutdown(); return false; }
     bool any = false;
-    try {
-        const auto directory = std::filesystem::path(path).parent_path() / L"LISAccess" / L"audio";
-        for (size_t i = 0; i < sounds.size(); ++i) {
-            const bool loaded = Load(directory / names[i], sounds[i]);
-            any |= loaded;
-            lis::Log(std::string("event=audio_load cue=") + labels[i] + (loaded ? " status=ready" : " status=missing_or_invalid"));
+    for (size_t i = 0; i < sounds.size(); ++i) {
+        bool loaded = false;
+        try {
+            if (count && count < std::size(path)) {
+                const auto directory = std::filesystem::path(path).parent_path() / L"LISAccess" / L"audio";
+                loaded = Load(directory / names[i], sounds[i]);
+            }
+        } catch (...) {
+            lis::Log("event=audio_load status=load_exception");
         }
-    } catch (...) {
-        lis::Log("event=audio_init status=load_exception");
-        Shutdown();
-        return false;
+        if (!loaded && i >= detail::NavigationCount) {
+            try { loaded = DefaultRewind(i); }
+            catch (...) { lis::Log("event=audio_load status=default_exception"); }
+        }
+        any |= loaded;
+        lis::Log(std::string("event=audio_load cue=") + labels[i] + (loaded ? " status=ready" : " status=missing_or_invalid"));
     }
     StopAll();
     if (!any) Shutdown();
@@ -156,11 +185,23 @@ bool Available(Cue kind) {
 }
 bool Play(Cue kind, float pan, float gain, float rate) {
     const size_t index = static_cast<size_t>(kind);
-    if (!enabled || index >= sounds.size() || !std::isfinite(pan) ||
+    if (!gate.Allows(index) || !std::isfinite(pan) ||
         !std::isfinite(gain) || !std::isfinite(rate) || gain <= 0) return false;
     auto& sound = sounds[index];
     if (!sound.voice) return false;
     XAUDIO2_VOICE_STATE state{};
+    if (kind == Cue::RewindCrossed) {
+        // Synchronize cancellation so no approach buffer survives the crossing.
+        engine->StopEngine();
+        Flush(static_cast<size_t>(Cue::RewindApproach), static_cast<size_t>(Cue::RewindCrossed));
+        if (FAILED(engine->StartEngine())) { StopAll(); return false; }
+    } else if (kind == Cue::RewindApproach) {
+        auto* crossed = sounds[static_cast<size_t>(Cue::RewindCrossed)].voice;
+        if (crossed) {
+            crossed->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
+            if (state.BuffersQueued) return false;
+        }
+    }
     sound.voice->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
     if (state.BuffersQueued) return false; // One dedicated source per kind, no backlog.
     pan = std::clamp(pan, -1.0f, 1.0f);

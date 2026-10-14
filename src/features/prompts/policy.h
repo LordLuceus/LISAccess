@@ -63,6 +63,7 @@ public:
         auto text=pending.front();pending.pop_front();return text;
     }
     std::wstring Repeat() {pending.clear();return latest.empty()?L"No prompt has been read yet.":latest;}
+    void Remember(const std::wstring& text){if(!CleanText(text).empty())latest=text;}
     void Background(){pending.clear();}
 };
 }
