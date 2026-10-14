@@ -8,5 +8,7 @@ inline constexpr uintptr_t ObjectDispatch=0x7b4b0, ActorDispatch=0x2a1b00;
 inline constexpr uintptr_t Free=0x259e0;
 inline constexpr uintptr_t ActionEligibility=0x9f6a40, InteractionPress=0x9918b0;
 inline constexpr uintptr_t DialogPress=0x991600;
+// IA_InputBox interface at IA_Dialogue+0x80; distinct from the actor interface.
+inline constexpr uintptr_t ScriptedDialogPress=0x991f70, ScriptedDialogInterface=0x102f274;
 inline constexpr uintptr_t ChoiceBindings=0x1236d20;
 }

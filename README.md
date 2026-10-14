@@ -107,6 +107,10 @@ you do not need to hear both sets of commands. The mapping stays **1 = Y, 2 = X,
 offer 2 and 3 rather than 1 and 2. Controller face buttons retain their native
 game behaviour; numbered keyboard choices use the same native dialogue handler.
 
+This also covers scripted decisions using the game's dialogue-choice interface,
+including the principal's question about Nathan. They use the same controls as
+ordinary conversations, without a separate mode to enable.
+
 - **1–4, number row:** select the corresponding offered answer.
 - **Ctrl+Home**, or **hold left-stick click and press D-pad right:** repeat the
   current choices without selecting anything.
@@ -116,16 +120,18 @@ game behaviour; numbered keyboard choices use the same native dialogue handler.
 
 Choice requests are checked again before activation. Hidden, unavailable or
 changed choices are not selected, and queued requests expire rather than firing
-after a long stall. Pauses, menu overlays and rewind/fast-forward states block
-the mod's choice input. The mod does not choose for you, advance the conversation
+after a long stall. Game pauses, menu overlays and active rewind/fast-forward
+block the mod's choice input. A scripted decision's normal frozen timeline does
+not block its available answers. The mod does not choose for you, advance the conversation
 on its own, pause a choice timer or extend its deadline. Timed choices are
 identified as timed; long speech may still outlast the game's deadline.
 When choices close, their readout is cancelled if it is still the mod's latest
 announcement, without cancelling a newer menu or prompt readout.
 
-The implementation is based on a passive capture of the classroom question
-and the game's own widget and input code. The initial dialogue build has passed
-its playtest; this does not establish coverage of every later question, timed
+The implementation is based on passive captures of the classroom question and
+the principal's decision, plus the game's own widget and input code. Both ordinary
+dialogue and the principal's scripted decision have passed their playtests.
+This does not establish coverage of every later question, timed
 choice or rewind transition. This does not add spoken subtitles or
 repeat the characters' voiced dialogue.
 

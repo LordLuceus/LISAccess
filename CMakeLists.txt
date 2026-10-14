@@ -42,6 +42,7 @@ target_link_libraries(lis_output PRIVATE prism::prism)
 add_library(lis_features OBJECT
     src/features/dialogue/dialogue.cpp
     src/features/dialogue/native.cpp
+    src/features/dialogue/scripted_owner.cpp
     src/features/camera/facing.cpp
     src/features/interactions/actions.cpp
     src/features/interactions/scanner.cpp
@@ -85,6 +86,7 @@ lis_test(narration_test narration tests/narration_test.cpp)
 lis_test(popup_test startup_popup tests/popup_test.cpp)
 lis_test(prompts_test prompt_policy tests/prompts_test.cpp)
 lis_test(dialogue_test dialogue_policy tests/dialogue_test.cpp)
+lis_test(scripted_choices_test scripted_choices tests/scripted_choices_test.cpp)
 lis_test(dialogue_lifecycle_test dialogue_lifecycle tests/dialogue_lifecycle_test.cpp src/features/dialogue/dialogue.cpp)
 lis_test(navigation_test navigation_geometry tests/navigation_test.cpp)
 lis_test(target_list_test scanner_target_list tests/target_list_test.cpp)

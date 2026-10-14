@@ -1,5 +1,6 @@
 #include "features/dialogue/native.h"
 #include "features/dialogue/bindings.h"
+#include "features/dialogue/scripted_owner.h"
 #include "features/world/session.h"
 #include "features/interactions/fields.h"
 #include "features/interactions/scanner.h"
@@ -15,7 +16,7 @@ using engine::Read;
 using engine::Copy;
 uintptr_t widgets=0,rewindManager=0;
 int cursor=0;
-bool inputFaulted=false;
+bool inputFaulted=false,scriptedInputFaulted=false;
 
 // Reuse the world reader's reflected metadata, not its traversal/physics gate.
 // Dialogue deliberately disables movement and can run in cinematic mode.
@@ -35,16 +36,9 @@ void DiscoverUi(world::Session& s) {
     if(cursor>=objects.count)cursor=0;
 }
 
-struct ChoiceMap {
-    engine::Array slots;
-    uint32_t bits[4];uintptr_t heapBits;
-    int bitCount,bitCapacity,firstFree,freeCount;
-    uint32_t hashInline;uintptr_t hashHeap;int hashSize;
-};
-static_assert(sizeof(ChoiceMap)==60);
-bool Bindings(world::Session& s,uintptr_t actor,std::array<int,4>& choices) {
-    ChoiceMap map{};choices.fill(-1);
-    if(!s.reflection.Value(actor,"WhatIfDialogActor","BindingChoiceIndexMap","StructProperty",map)||
+bool Bindings(world::Session& s,uintptr_t actor,const char* type,std::array<int,4>& choices) {
+    NativeChoiceMap map{};choices.fill(-1);
+    if(!s.reflection.Value(actor,type,"BindingChoiceIndexMap","StructProperty",map)||
        !world::ValidArray(map.slots,16))return false;
     if(!map.slots.count&&!map.bitCount&&!map.freeCount)return true;
     if(map.heapBits||map.bitCount!=map.slots.count||
@@ -81,8 +75,8 @@ void ReadFrame(NativeFrame& out) {
     DiscoverUi(s);if(!s.ready)return;
     out.reason="player_context";
     const uintptr_t controller=Player(s);unsigned char gameplay=0;
-    if(!controller||!f.Value(controller,"WhatIfController","CurrentGameplayType","ByteProperty",gameplay)||gameplay!=3)return;
-    out.view.context=true;
+    if(!controller||!f.Value(controller,"WhatIfController","CurrentGameplayType","ByteProperty",gameplay)||gameplay<1||gameplay>3)return;
+    out.view.context=gameplay==3;
     uintptr_t input=0;
     // Same authoritative mode flag as object-action narration; not whether a
     // controller merely happens to be connected, nor the traversal snapshot.
@@ -90,12 +84,23 @@ void ReadFrame(NativeFrame& out) {
         out.view.gamepad=f.BoolIsSet(input,"WhatIfInput","bPlayingWithGamepad");
     out.reason="dialogue_owner";
     uintptr_t component=0,actor=0;
-    if(!interaction::ReadComponent(std::cref(f),controller,component)||!r.Instance(component)||!r.IsA(component,"DNEWhatIfInteractionComponent")||
-       !f.Value(component,"DNEWhatIfInteractionComponent","CurrentDialog","ObjectProperty",actor)||!r.Instance(actor)||!r.IsA(actor,"WhatIfDialogActor"))return;
+    const uintptr_t world=Read<uintptr_t>(controller+0xd8);
+    if(!r.Instance(world))return;
+    const bool ordinary=gameplay==3&&interaction::ReadComponent(std::cref(f),controller,component)&&
+        r.Instance(component)&&r.IsA(component,"DNEWhatIfInteractionComponent")&&
+        f.Value(component,"DNEWhatIfInteractionComponent","CurrentDialog","ObjectProperty",actor)&&
+        r.Instance(actor)&&r.IsA(actor,"WhatIfDialogActor");
+    unsigned registeredSlots=15;
+    if(!ordinary) {
+        RegisteredChoices registered;
+        out.reason="scripted_owner";
+        if(!ScriptedOwner(s,controller,world,registered)||!registered.owner)return;
+        actor=registered.owner;registeredSlots=registered.slots;out.scripted=true;out.view.context=true;
+    } else if(Read<uintptr_t>(actor+0xd8)!=world)return;
+    const char* type=out.scripted?"IA_Dialogue":"WhatIfDialogActor";
     out.reason="world_pause";
-    const uintptr_t world=Read<uintptr_t>(controller+0xd8);uintptr_t pauser=0;
-    if(!r.Instance(world)||Read<uintptr_t>(actor+0xd8)!=world||
-       !f.Value(world,"WorldInfo","Pauser","ObjectProperty",pauser)||pauser)return;
+    uintptr_t pauser=0;
+    if(!f.Value(world,"WorldInfo","Pauser","ObjectProperty",pauser)||pauser)return;
     for(const char* flag:{"bSystemPause","bDeviceLostPause","bFocusLostPause","bStreamingPause","bMenuPause","bTutoPause","bGameplayPause","bBehaviorPause"})
         if(!f.ClearBool(controller,"WhatIfController",flag)){out.reason=flag;return;}
     out.reason="menu";
@@ -105,9 +110,10 @@ void ReadFrame(NativeFrame& out) {
     }
     unsigned char rewind=255;int sequence=0;
     out.reason="rewind";
-    // ERewindManagerState: 0 ERMS_Playing; 1..4 rewind/pause/fast-forward.
+    // Ordinary conversations still require Playing. Registered scripted choices
+    // can normally pause the timeline; no owner may answer during active rewind.
     if(!r.Instance(rewindManager)||r.ClassOf(rewindManager)!="WhatIfRewindManager"||
-       !f.Value(rewindManager,"RewindManager","CurrentState","ByteProperty",rewind)||rewind!=0||
+       !f.Value(rewindManager,"RewindManager","CurrentState","ByteProperty",rewind)||!ChoiceRewindAllowed(out.scripted,rewind)||
        !f.Value(rewindManager,"RewindManager","RewindSequenceCounter","IntProperty",sequence))return;
     int offset=0;uintptr_t owner=0,root=0;
     out.reason="widget_owner";
@@ -122,23 +128,26 @@ void ReadFrame(NativeFrame& out) {
         if(!f.ClearBool(widget,"GFxWidget",flag)){out.reason=flag;return;}
     out.reason="waiting_for_choices";
     int wait=0,event=0,chosen=0,page=-1;uintptr_t node=0;engine::Name id{};
-    if(!f.Value(actor,"WhatIfDialogActor","WaitClosingState","IntProperty",wait)||
+    if(out.scripted) {
+        if(!ScriptedWaiting(s,actor)||!f.Value(actor,"IA_Seq","CurrentFinalState","ObjectProperty",node))return;
+    } else if(!f.Value(actor,"WhatIfDialogActor","WaitClosingState","IntProperty",wait)||
        !f.Value(actor,"WhatIfDialogActor","WIDA_WAIT_EVENT","IntProperty",event)||wait!=event||
        !f.Value(actor,"WhatIfDialogActor","ChoiceIndexChoosen","IntProperty",chosen)||chosen!=-1||
        !f.Value(actor,"WhatIfDialogActor","CurrentDialogNode","StructProperty",node)||!node||
        !f.Value(actor,"WhatIfDialogActor","CurrentChoicePageIndex","IntProperty",page)||page<0||
        !f.Value(actor,"WhatIfDialogActor","CurrentDialogId","NameProperty",id))return;
-    out.blocked=false;out.actor=actor;
+    out.blocked=false;out.owner=actor;
     out.reason="choice_data";
     out.problem=L"Dialogue choices could not be read safely. Native dialogue controls still work.";
     std::array<int,4> indices{};engine::Array args{};Value values[12]{};
-    if(!Bindings(s,actor,indices)||!f.Value(actor,"WhatIfDialogActor","SavedInvokeArgs","ArrayProperty",args)||
+    if(!Bindings(s,actor,type,indices)||!f.Value(actor,type,"SavedInvokeArgs","ArrayProperty",args)||
        !world::ValidArray(args,64)||args.count!=12||!Copy(values,args.data,sizeof(values)))return;
-    const uintptr_t arrayProperty=f.Field("WhatIfDialogActor","SavedInvokeArgs","ArrayProperty",12);
+    const uintptr_t arrayProperty=f.Field(type,"SavedInvokeArgs","ArrayProperty",12);
     const uintptr_t inner=Read<uintptr_t>(arrayProperty+0x80);
     if(!r.Registered(inner)||r.ClassOf(inner)!="StructProperty"||Read<int>(inner+0x44)!=sizeof(Value))return;
     out.view.identity=std::to_string(actor)+":"+std::to_string(node)+":"+std::to_string(page)+":"+
         r.Name(id.index)+":"+std::to_string(id.number)+":"+std::to_string(sequence);
+    if(out.scripted)out.view.identity="scripted:"+out.view.identity+":"+r.Path(actor)+":"+std::to_string(rewind);
     bool any=false;
     for(unsigned i=0;i<4;++i) {
         if(values[i].type!=3||values[i+4].type!=4)return;
@@ -146,28 +155,30 @@ void ReadFrame(NativeFrame& out) {
         out.view.identity+=":"+std::to_string(indices[i]);
         choice.offered=(values[i+4].boolean&1)&&indices[i]>=0&&!choice.key.empty();
         if(!choice.offered)continue;
+        if(!(registeredSlots&(1u<<i)))return;
         choice.text=CleanText(s.localization.Translate(r,s.base,s.localize,controller,choice.key,L""));
         if(choice.text.empty()||choice.text.rfind(L"$GT_",0)==0)return;
         any=true;
     }
     float timeout=0;
-    if(!f.Value(actor,"WhatIfDialogActor","TotalChoiceTimeout","FloatProperty",timeout)||!std::isfinite(timeout))return;
+    if(!f.Value(actor,type,out.scripted?"TimeOut":"TotalChoiceTimeout","FloatProperty",timeout)||!std::isfinite(timeout))return;
     out.view.timed=timeout>0;out.view.visible=any;out.problem.clear();out.reason=any?"ready":"no_offered_choices";
 }
-bool Send(world::Session& s,uintptr_t actor,unsigned slot) {
+bool Send(world::Session& s,const NativeFrame& frame,unsigned slot) {
+    bool& fault=frame.scripted?scriptedInputFaulted:inputFaulted;
     __try {
-        if(inputFaulted)return false;
+        if(fault)return false;
         int offset=0;engine::Name binding{};
-        if(!s.reflection.Offset("WhatIfGameplayActor","VfTable_IInputListenerInterface","StructProperty",4,offset)||
-           offset!=0x26c||!world::Binding(s,slot,binding))return false;
-        const uintptr_t listener=actor+offset,method=Read<uintptr_t>(Read<uintptr_t>(listener)+8);
-        if(method!=s.base+engine::profile::DialogPress)return false;
-        // Captured vtable + static handler: FName and ignored third word, ret 0x0c.
+        if(!s.reflection.Offset(frame.scripted?"IA_InputBox":"WhatIfGameplayActor","VfTable_IInputListenerInterface","StructProperty",4,offset)||
+           offset!=(frame.scripted?0x80:0x26c)||!world::Binding(s,slot,binding))return false;
+        const uintptr_t listener=frame.owner+offset,method=Read<uintptr_t>(Read<uintptr_t>(listener)+8);
+        if(method!=s.base+(frame.scripted?engine::profile::ScriptedDialogPress:engine::profile::DialogPress))return false;
+        // Both handlers independently verified: FName + ignored word, ret 0x0c.
         // Native code validates the map, records the choice and closes its own UI.
         using Press=uint32_t(__thiscall*)(void*,engine::Name,void*);
         reinterpret_cast<Press>(method)(reinterpret_cast<void*>(listener),binding,nullptr);
         return true;
-    } __except(EXCEPTION_EXECUTE_HANDLER){inputFaulted=true;return false;}
+    } __except(EXCEPTION_EXECUTE_HANDLER){fault=true;return false;}
 }
 }
 bool SampleNative(NativeFrame& frame) {
@@ -179,7 +190,7 @@ std::wstring ActivateNative(const Snapshot& expected,unsigned slot) {
     if(!SampleNative(current))return L"Dialogue inspection failed; no choice was sent.";
     if(!CanActivate(expected,current.view,static_cast<int>(slot),IsGameForeground(),current.blocked))
         return L"The dialogue choices changed or are unavailable. Read them again before choosing.";
-    if(!Send(world::GameSession(),current.actor,slot))return inputFaulted
+    if(!Send(world::GameSession(),current,slot))return (current.scripted?scriptedInputFaulted:inputFaulted)
         ? L"Dialogue input failed and has been disabled. Check the game before choosing again."
         : L"This dialogue input interface is unsupported. No choice was sent.";
     return {};

@@ -1,5 +1,14 @@
 # LISAccess changelog
 
+## 2026-10-14 — Scripted dialogue choices
+
+- Added reading and numbered keyboard selection for scripted decisions, including
+  the principal's question about Nathan. These use the same repeat/help controls
+  and device-specific announcements as ordinary conversations.
+- Choices remain available when the game normally freezes its timeline for such
+  a decision. Active rewinding, fast-forwarding and menu overlays still prevent
+  the mod from selecting an answer.
+
 ## 2026-10-14 — Expanded scanner
 
 - The scanner now lists active, eligible interactions across the loaded areas,

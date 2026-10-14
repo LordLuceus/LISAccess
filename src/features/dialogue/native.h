@@ -3,7 +3,8 @@
 namespace lis::dialogue {
 struct NativeFrame {
     Snapshot view;
-    uintptr_t actor=0;
+    uintptr_t owner=0; // WhatIfDialogActor or registered IA_Dialogue UObject.
+    bool scripted=false;
     bool blocked=true;
     std::string reason="initializing";
     std::wstring problem;
