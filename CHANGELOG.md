@@ -1,5 +1,25 @@
 # LISAccess changelog
 
+## 2026-10-14 — Journal, SMS and object text reader
+
+- Added item-by-item reading for the current journal and character text, SMS
+  contacts with unread counts, and completed conversation messages. SMS starts
+  at the latest completed message and does not read replies still being typed.
+  Earlier prequel pages are included. Journal and character text follows book
+  reading order, rather than placing later paragraphs before their introductions.
+- Added Ctrl+Left/Right for diary tabs, Up/Down for text items and message history,
+  and R to repeat. Controller reading uses D-pad Up/Down and left-stick click;
+  right-stick click reads help. The game's page, contact and back controls remain.
+- Read the Files tab's existing text view after opening it with Enter/A.
+  World poster/document inspection now uses the same native text-view reader,
+  with inspection-specific help instead of an erroneous diary warning. R or
+  left-stick click repeats; F1 or right-stick click reads help.
+  Images without a supplied text version are not transcribed, and some other
+  diary pages remain unsupported. Older offscreen SMS dates may be unavailable.
+- Diary reading is separate from the game's visual scrolling. Closing the diary
+  stops its obsolete readout without stopping a newer announcement; gameplay
+  scanner controls remain inactive while the diary owns input.
+
 ## 2026-10-14 — Exit areas in the scanner
 
 - Added active scripted exit areas, including the hallway exit to the main campus,

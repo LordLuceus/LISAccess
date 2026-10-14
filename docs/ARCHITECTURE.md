@@ -55,6 +55,50 @@ adapters borrow the cache rather than copying its property table for every targe
 
 ### Validation and lifetime are behaviour
 
+`features/journal` attaches to the separate native `SensenMenu` movie, not the
+frontend `OutGameSensenMenu`. The world discovery list now treats the diary as a
+menu for every gameplay consumer. A diary may own input even when its page has
+no readable text. Snapshots and UI dispatch run on the game thread; worker-side
+cursor and controller policy use copied values and expire stale input.
+
+The pure diary reader consumes the current Flash page's `PageElements` and
+selection helpers. It never enumerates static journal/SMS definitions. SMS
+`FadeInSMS` and raw response arrays are excluded; the current element's typing
+timer/fade flag must permit reading before its body is extracted. Completed
+offscreen history can use native localization; unavailable rendered dates are
+omitted. Current journal text can likewise fall back to its supplied localized
+resource, but only for visible text elements. Images are not guessed or OCRed.
+
+Book text uses the supplied `PositionX/PositionY` to read the left page top-down,
+then the right page. Unknown-position items retain their slots. Real principal and
+Victoria layouts are regression fixtures, identified by unique export paths/indices
+(short UE3 export names are not unique). Native prequel day `-1` is valid; negative
+page indices and other invalid day values are not. `CMD_OBJECT_VIEWER` shares the
+working `CMD_FILESELECT` text-view extraction, but has inspection-specific wording
+and controls. Text is read only after the native description view opens. Both
+contexts continue blocking gameplay input, including when not yet readable.
+
+GFx `GetVariable` returns a typed ASValue; missing numbers stay NaN rather than
+silently selecting index zero. Native reflection checks its 36-byte parameter
+layout and return offset. Tab commands expire after 450 ms, re-read the owning
+movie/page, and mirror the original focus-stack key dispatch (including its
+nonrepeat pass) with keyboard index zero and `from_joystick=false`. Native handlers
+retain loading, page and tab restrictions. Covered pages may be
+`DNEMenuPageFocusProxy` objects with no key handler: AS undefined/null are normal
+false results, not bridge errors. Typed dispatch results separate that fall-through
+from invalid native receivers/functions and unknown value tags. Regression tests
+cover proxy chains and a loading page consuming input before the root handler.
+`ASValue.Type` is a one-byte reflected field, not a 32-bit enum; `B` at offset4
+uses bit mask1. Native copies can carry uninitialized padding/unused bits, so
+`ScriptValue` models the byte and padding explicitly and Boolean reads mask bit0.
+The dirty-padding regression uses the reflected24-byte layout, not zero-filled
+synthetic scalar results. Native tab switching passed the user's retest; the
+successful trace did not contain dirty padding, so it does not establish that
+padding caused every earlier failure.
+The reading cursor is deliberately
+separate from pixel scrolling. Source-derived tests and stubbed lifecycle tests
+do not certify the live native binding or its visual-scroll behaviour.
+
 Dialogue reuses the world's reflected metadata cache, not its traversal or physics
 gate. It reads the current actor's filtered UI arguments and sparse binding map,
 then localizes those offered keys through the game's existing localization path.

@@ -1,0 +1,43 @@
+#include "features/journal/policy.h"
+#include <iostream>
+using namespace lis::journal;
+int main() {
+    int errors=0;auto check=[&](bool ok,const char* message){std::cout<<(ok?"PASS: ":"FAIL: ")<<message<<'\n';errors+=!ok;};
+    Page p;p.ready=true;p.kind=View::Messages;p.title=L"Messages. Warren";
+    p.items={{"a",L"Warren: First message."},{"b",L"Max: Second message."}};p.selected=1;
+    Cursor cursor;
+    auto opening=cursor.Update(p,"conversation");
+    check(cursor.index==1&&opening.find(L"Second message")!=std::wstring::npos,"opens at latest completed message");
+    check(opening.find(L"2 of 2.")==opening.size()-7,"position is last, with no double period");
+    check(cursor.Update(p,"conversation").empty(),"stable snapshots do not repeat");
+    check(cursor.Move(p,-1).find(L"First message")!=std::wstring::npos,"up reads older message");
+    p.items.push_back({"c",L"Warren: Newly completed reply."});
+    check(cursor.Update(p,"conversation").find(L"Newly completed")!=std::wstring::npos&&cursor.index==0,"incoming reply announced without moving a history reader");
+    check(cursor.Update(p,"conversation").empty(),"completed reply announced once");
+    cursor.Move(p,1);cursor.Move(p,1);
+    p.items.push_back({"d",L"Max: Another reply."});
+    cursor.Update(p,"conversation");
+    check(cursor.index==3,"reading at end follows new completed messages");
+    check(cursor.Move(p,1)==L"Last item.","no wrap at conversation end");
+    p.kind=View::Journal;p.selected=0;
+    cursor.Update(p,"page2");check(cursor.index==0,"new journal page starts at first paragraph");
+    check(cursor.Move(p,-1)==L"First item.","no wrap at page start");
+    p.ready=false;check(cursor.Update(p,"not-ready").empty()&&cursor.context=="page2","loading does not discard reading position");
+    Page list;list.ready=true;list.kind=View::List;list.title=L"Contacts";list.selected=0;
+    list.nativeIndex=3;list.nativeCount=6;list.items={{"mom",L"Mom. 2 unread"}};
+    auto label=cursor.Update(list,"contacts");
+    check(label.find(L"4 of 6.")!=std::wstring::npos,"uses real native list position, not one extracted-item count");
+    list.items[0]={"dad",L"Dad. 0 unread"};list.nativeIndex=4;
+    check(cursor.Update(list,"contacts").find(L"Dad")!=std::wstring::npos,"native contact movement narrated");
+    PadReader pad;
+    check(pad.Update(1,true,true,100)==0&&pad.Update(1,true,true,900)==0,"held direction on diary entry cannot move cursor");
+    pad.Update(0,true,true,1000);
+    check(pad.Update(1,true,true,1100)==1&&pad.Update(1,true,true,1300)==0&&pad.Update(1,true,true,1550)==1,"controller direction has edge and bounded hold repeat");
+    pad.Update(0,true,true,1600);
+    check(pad.Update(0x40,true,true,1700)==3,"left stick click rereads");
+    check(pad.Update(0x80,true,true,1800)==4,"right stick click helps");
+    check(pad.Update(2,false,true,1900)==0&&pad.Update(2,true,true,2000)==0,"inactive context drops and re-primes held input");
+    check(pad.Update(2,true,false,2100)==0,"disconnection cannot move cursor");
+    cursor.Reset();check(cursor.context.empty()&&cursor.selected.empty()&&cursor.seen.empty(),"closing drops stale page and message history");
+    return errors?1:0;
+}

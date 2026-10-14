@@ -7,6 +7,7 @@
 #include "features/navigation/navigation.h"
 #include "features/prompts/prompts.h"
 #include "features/dialogue/dialogue.h"
+#include "features/journal/journal.h"
 #include "platform/foreground.h"
 #include "platform/log.h"
 #include "output/speech.h"
@@ -26,6 +27,7 @@ void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
     prompts::Tick();
     navigation::Tick();
     dialogue::Tick();
+    journal::Tick();
     if (!failed && !menus::SafeSnapshot()) { failed = true; Log("event=bridge_fault status=disabled"); }
 }
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
@@ -33,8 +35,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
         if (!failed && !menus::SafeSnapshot()) { failed = true; Log("event=bridge_fault status=disabled"); }
         return 0;
     }
-    if (message == WM_KEYDOWN && !(lp & (1LL<<30))) {
-        if (menus::HandleKey(wp)) return 0;
+    if (message == WM_KEYDOWN) {
+        const bool repeated=(lp&(1LL<<30))!=0;
+        if(journal::HandleKey(wp,repeated))return 0;
+        if (!repeated&&menus::HandleKey(wp)) return 0;
     }
     return CallWindowProcW(previousProc, hwnd, message, wp, lp);
 }
@@ -71,6 +75,7 @@ void RunRuntime(HMODULE module) {
     previousProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(WindowProc)));
     if (!previousProc) { Log("event=subclass_failed"); Speak(L"Could not attach menu inspection."); return; }
     navigation::Initialize(module);
+    journal::Initialize();
     prompts::Initialize(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)));
     timer = SetTimer(window, 0x4c4953, 200, TimerProc);
     if (!timer) { Log("event=timer_failed"); Speak(L"Could not start menu inspection."); return; }
@@ -85,6 +90,7 @@ void RunRuntime(HMODULE module) {
         bool interrupt=true;
         std::wstring speech = menus::ConsumeSpeech(foreground, wasForeground, readableMenu,interrupt);
         if (!speech.empty() && foreground) Speak(speech,interrupt);
+        readableMenu=journal::Pump(foreground)||readableMenu;
         navigation::Pump(foreground, readableMenu);
         dialogue::Pump(foreground, readableMenu);
         prompts::Pump(foreground,readableMenu);
@@ -93,6 +99,7 @@ void RunRuntime(HMODULE module) {
     }
     KillTimer(window, timer);
     navigation::Shutdown();
+    journal::Shutdown();
     ShutdownPlatform();
 }
 }

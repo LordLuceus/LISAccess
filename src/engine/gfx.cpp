@@ -5,11 +5,18 @@
 #include "engine/object_registry.h"
 #include "platform/text.h"
 #include <vector>
+#include <cmath>
+#include <limits>
+#include <cstddef>
 
 namespace lis::engine::gfx {
 namespace {
 uintptr_t base = 0, menu = 0, stringFn = 0, numberFn = 0, invokeFn = 0, objectStringFn = 0, boolFn = 0;
+uintptr_t valueFn=0;
 struct FString { wchar_t* data; int count; int capacity; };
+using Value=ScriptValue<FString>;
+static_assert(sizeof(Value)==24);
+static_assert(offsetof(Value,type)==0&&offsetof(Value,boolean)==4&&offsetof(Value,number)==8&&offsetof(Value,text)==12);
 static_assert(sizeof(FString) == 12);
 ObjectRegistry Registry() { return ObjectRegistry(base, RegistryPolicy::Menu); }
 std::string Name(int index) { return Registry().Name(index); }
@@ -64,6 +71,7 @@ void Discover() {
             if (name == "GetVariableNumber" && Function(obj, name.c_str(), 16)) numberFn = obj;
             if (name == "GetVariableBool" && Function(obj, name.c_str(), 16)) boolFn = obj;
             if (name == "Invoke" && Function(obj, name.c_str(), 48)) invokeFn = obj;
+            if(name=="GetVariable"&&Function(obj,name.c_str(),36)&&Read<unsigned short>(obj+0xa4)==12)valueFn=obj;
         }
         if (cls == "OutGameSensenMenu" && ObjectName(obj).find("Default__") != 0 &&
             Read<uintptr_t>(Read<uintptr_t>(obj) + 72 * 4) == base + profile::ObjectDispatch) menu = obj;
@@ -115,11 +123,42 @@ std::wstring ObjectString(uintptr_t object,const std::string& member) {
     return TakeString(p.result);
 }
 std::wstring Text(const std::string& objectPath) {
+    return Text(menu,objectPath);
+}
+std::wstring Text(uintptr_t receiver,const std::string& objectPath) {
     std::wstring method = Wide(objectPath + ".GetText");
-    struct Value { unsigned type; unsigned boolean; float number; FString text; };
     struct Params { FString method; Array args; Value result; } p{Borrow(method), {}, {}};
     static_assert(sizeof(Params) == 48);
-    Event(invokeFn, &p);
+    Event(invokeFn, &p,receiver);
     return TakeString(p.result.text);
+}
+bool ValuesReady(){return Function(valueFn,"GetVariable",36)&&Read<unsigned short>(valueFn+0xa4)==12&&Function(invokeFn,"Invoke",48);}
+float CheckedNumber(uintptr_t receiver,const std::string& path) {
+    if(!ValuesReady())return std::numeric_limits<float>::quiet_NaN();
+    std::wstring name=Wide(path);
+    struct Params {FString path;Value result;} p{Borrow(name),{}};
+    static_assert(sizeof(Params)==36);
+    Event(valueFn,&p,receiver);
+    const auto result=p.result.type==2?p.result.number:p.result.type==4?static_cast<float>(p.result.boolean&1):std::numeric_limits<float>::quiet_NaN();
+    TakeString(p.result.text);return result;
+}
+float GetterNumber(uintptr_t receiver,const std::string& method) {
+    if(!ValuesReady())return std::numeric_limits<float>::quiet_NaN();
+    std::wstring name=Wide(method);
+    struct Params {FString method;Array args;Value result;} p{Borrow(name),{},{}};
+    static_assert(sizeof(Params)==48);
+    Event(invokeFn,&p,receiver);
+    const auto result=p.result.type==2?p.result.number:std::numeric_limits<float>::quiet_NaN();
+    TakeString(p.result.text);return result;
+}
+KeyResult DispatchKey(uintptr_t receiver,const std::string& method,float number) {
+    if(!ValidMovie(receiver)||!ValuesReady()||!std::isfinite(number))return KeyResult::Failed;
+    // AS onKeyFunc(keyCode, keyboard_index, from_joystick), keyboard command.
+    std::wstring name=Wide(method);Value args[]={{2,{},0,number,{}},{2,{},0,0,{}},{4,{},0,0,{}}};
+    struct Params {FString method;Array args;Value result;} p{Borrow(name),{reinterpret_cast<uintptr_t>(args),3,3},{}};
+    static_assert(sizeof(Params)==48);
+    Event(invokeFn,&p,receiver);
+    const auto text=TakeString(p.result.text);
+    return KeyReturn(p.result.type,p.result.boolean,p.result.number,!text.empty());
 }
 }

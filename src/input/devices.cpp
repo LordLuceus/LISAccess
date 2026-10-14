@@ -28,4 +28,10 @@ Presses Devices::ReadController(int controllerIndex,bool active,uint64_t now,boo
     padWasConnected_=connected;previousPadIndex_=padIndex_;
     return presses;
 }
+bool Devices::ReadButtons(int controllerIndex,uint16_t& buttons) {
+    if(controllerIndex>=0&&controllerIndex<4)padIndex_=controllerIndex;
+    XINPUT_STATE pad{};buttons=0;
+    if(!getPadState_||getPadState_(static_cast<DWORD>(padIndex_),&pad)!=ERROR_SUCCESS)return false;
+    buttons=pad.Gamepad.wButtons;return true;
+}
 }

@@ -14,10 +14,10 @@ using engine::Array;
 bool GatePlayer(Session& session,Snapshot& s,uintptr_t& pawn) {
     session.liveController=session.liveWorld=session.liveFocus=0;
     if (!Discover(session)) { s.reason = "discovering bounded world metadata"; return false; }
-    for (uintptr_t m : session.menus) if (session.reflection.registry.Instance(m) && (session.reflection.registry.ClassOf(m)=="PauseMenu" || session.reflection.registry.ClassOf(m)=="OutGameSensenMenu")) {
+    for (uintptr_t m : session.menus) if (session.reflection.registry.Instance(m) && session.reflection.registry.IsA(m,"SensenMenuBase")) {
         unsigned char opening = 0;
         if (!session.reflection.Value(m, "SensenMenuBase", "OpeningState", "ByteProperty", opening) || opening != 0) {
-            s.reason = "pause or out-game menu"; return false;
+            s.reason = "pause, diary or out-game menu"; return false;
         }
     }
     uintptr_t controller = 0, world = 0;

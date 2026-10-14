@@ -38,7 +38,7 @@ bool Discover(Session& session) {
             else {session.exitFaulted=true;Log("event=exit_scan_fault reason=discovery_bound interactions=preserved");}
         }
         if (cls == "WhatIfController") Add(session.controllers, p);
-        if (cls == "PauseMenu" || cls == "OutGameSensenMenu") Add(session.menus, p);
+        if (cls == "PauseMenu" || cls == "OutGameSensenMenu" || cls=="SensenMenu") Add(session.menus, p);
         std::string shortName=name;
         const int number=Read<int>(p+0x30);
         if(number>0) shortName+="_"+std::to_string(number-1);

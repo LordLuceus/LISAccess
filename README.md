@@ -10,6 +10,8 @@ needs listening feedback. The corrected scanner and interactions have been
 playtested through the classroom selfie, including automatic target announcements
 while aiming with the right stick. Dialogue-choice narration and selection have
 also passed their initial playtest.
+The journal/SMS reader, keyboard tab switching, prequel pages, book reading order,
+Files text views and world-object inspection have passed their initial playtest.
 This is not complete gameplay accessibility, and silence never means that an area
 is safe.
 
@@ -45,6 +47,9 @@ reuse rights to the sounds.
 - Reads the common confirmation-message widget and its confirm/cancel/continue
   controls. It does not invent a highlighted Yes/No choice where the game has none.
 - Repeats the current menu readout when returning focus to the game.
+- Reads current journal and character text, SMS contacts and completed messages,
+  and the Files tab's native text view. World document/poster inspection also reads
+  the game's text view when available. See the controls below.
 
 This is not complete menu coverage: settings values, account/login pages, all
 confirmation variants and gameplay UI have not been fully tested. Unrecognized or
@@ -96,6 +101,63 @@ animated-tutorial captions, plus composed menu popups and startup slides—not t
 baked into videos or images. This prompt reader does not add subtitles,
 nor announcements for the autosave icon itself. Startup narration and the photo
 and selfie tutorials have been playtested successfully.
+
+## Journal and SMS
+
+Open the diary with the game's **Tab or End**, or the controller's **Back/View**
+button. The mod reads one item at a time, not the whole page or conversation.
+The game still decides which tabs, pages and contacts are available.
+
+| Keyboard | Controller | Action |
+| --- | --- | --- |
+| Ctrl+Left / Ctrl+Right | Left / right bumper | Switch diary tabs when available |
+| Left / Right | Native left / right controls | Turn journal pages |
+| Up / Down | D-pad up / down | Read previous/next text item, or older/newer SMS message |
+| Native directional controls | Native directional controls | Select a contact or other list entry |
+| Enter | A | Open the selected entry; show a file's text version when available |
+| Escape | B | Go back; close a file's text view before leaving the file |
+| R | Left-stick click | Repeat the current item |
+| F1 | Right-stick click | Read diary help |
+
+Journal and character pages start at their first readable text item, reading the
+left page top-to-bottom before the right page. This includes the earlier, prequel
+journal pages. SMS opens
+at the latest completed message. Contacts include the game's unread count;
+messages identify their sender and include a displayed date when available.
+New completed replies are announced once. A reply still being typed is not read
+early. If you are browsing older messages, a new reply does not move your reading
+position. Holding Up/Down or the D-pad repeats navigation.
+
+The reading cursor is separate from the game's pixel scrolling: history can be
+read without having to position a bubble precisely on screen. Controller scrolling
+still runs natively. Native page changes and tab availability are preserved; the
+mod does not send messages, choose replies or unlock content. Scanner and object
+action shortcuts are inactive while the diary is open. **R remains rewind during
+ordinary gameplay**, but repeats text in readable menus and object-inspection views.
+
+This reader is still being playtested. Decorative journal artwork
+is skipped, not described. Photo/file images and SMS attachments are not transcribed
+unless the game supplies a text version; a file's existing text view must first be
+opened with Enter/A. Dates may be omitted from older SMS messages whose visual
+bubbles are unloaded. Some other diary pages or embedded UI elements may report
+that they are not yet readable. Source-derived tests cover extraction and input
+policy, but do not prove that every live clip path, language or transition works.
+
+## Inspecting posters and documents
+
+When an interaction opens the game's image-inspection screen, the mod identifies
+it as **Object inspection**, not as an unreadable diary page. If the game supplies
+a text version, press **Enter**, or **A** on a controller, to open and hear it.
+**R**, or **left-stick click**, repeats it. **F1**, or **right-stick click**, reads
+inspection help. **Escape/B** returns to the image before closing inspection.
+In the image view, native **Left/Right** or **D-pad left/right** changes pages when
+the inspected object has more than one image.
+
+This uses the game's existing transcriptions; it does not invent a description of
+an image that has none. Image-only photos and other artwork remain a separate gap.
+Gameplay scanner/action commands stay inactive throughout inspection, and the
+diary's Ctrl+Left/Right tab shortcuts do not apply here. The Files tab continues
+to use its already-tested native text view in the same way as before.
 
 ## Dialogue choices
 
@@ -153,9 +215,10 @@ use; existing saves are not disposable test data.
 | F1 | Read help for readable menu focus, dialogue, or navigation during supported gameplay |
 | F3 | Preview the next navigation sound in readable menus or supported gameplay (experimental) |
 
-R remains the game's rewind key outside menu narration. Native movement bindings
+R remains the game's rewind key outside readable menus and object inspection. Native movement bindings
 are not changed. Scanner shortcuts ignore Ctrl and Alt; Shift+Home is the one
-shifted shortcut. Controller menus keep their native controls. Controller scanner
+shifted shortcut. Ordinary controller menus keep their native controls; the diary
+adds the reading commands listed above. Controller scanner
 commands, including sound preview, run in gameplay only; keyboard F3 also works
 in readable menus.
 

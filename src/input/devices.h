@@ -14,6 +14,7 @@ public:
     void Shutdown();
     Presses ReadKeyboard(bool foreground,uint64_t now);
     Presses ReadController(int controllerIndex,bool active,uint64_t now,bool repeatAllowed=false);
+    bool ReadButtons(int controllerIndex,uint16_t& buttons);
 private:
     using GetPadState=DWORD(WINAPI*)(DWORD,XINPUT_STATE*);
     HMODULE module_=nullptr;
