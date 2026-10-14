@@ -1,5 +1,11 @@
 # LISAccess changelog
 
+## 2026-10-14 — Dialogue after using menus
+
+- Fixed visible dialogue choices becoming silent and numbered choice keys reporting
+  them unavailable after earlier menus had closed. Real open menus still prevent
+  selecting an answer behind them.
+
 ## 2026-10-14 — Journal, SMS and object text reader
 
 - Added item-by-item reading for the current journal and character text, SMS

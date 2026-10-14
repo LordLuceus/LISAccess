@@ -1,6 +1,7 @@
 #include "features/journal/native.h"
 #include "features/journal/tab_dispatch.h"
 #include "features/world/session.h"
+#include "features/world/menu_state.h"
 #include "features/prompts/policy.h"
 #include "engine/gfx.h"
 #include "platform/foreground.h"
@@ -21,7 +22,7 @@ void ReadFrame(Frame& out) {
     if(!s.ready)return;
     unsigned char state=0;bool other=false;
     for(auto m:s.menus) {
-        if(!r.Instance(m)||!r.IsA(m,"SensenMenuBase"))continue;
+        if(!world::IsMenuInstance(r,m))continue;
         unsigned char opening=0;
         if(!f.Value(m,"SensenMenuBase","OpeningState","ByteProperty",opening)||!opening)continue;
         if(r.ClassOf(m)!="SensenMenu"){other=true;continue;}

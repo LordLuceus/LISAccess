@@ -2,6 +2,7 @@
 #include "features/dialogue/bindings.h"
 #include "features/dialogue/scripted_owner.h"
 #include "features/world/session.h"
+#include "features/world/menu_state.h"
 #include "features/interactions/fields.h"
 #include "features/interactions/scanner.h"
 #include "engine/build_profile.h"
@@ -104,10 +105,7 @@ void ReadFrame(NativeFrame& out) {
     for(const char* flag:{"bSystemPause","bDeviceLostPause","bFocusLostPause","bStreamingPause","bMenuPause","bTutoPause","bGameplayPause","bBehaviorPause"})
         if(!f.ClearBool(controller,"WhatIfController",flag)){out.reason=flag;return;}
     out.reason="menu";
-    for(uintptr_t m:s.menus)if(r.Instance(m)) {
-        unsigned char opening=0;
-        if(!f.Value(m,"SensenMenuBase","OpeningState","ByteProperty",opening)||opening)return;
-    }
+    for(uintptr_t m:s.menus)if(world::BlockingMenu(f,m))return;
     unsigned char rewind=255;int sequence=0;
     out.reason="rewind";
     // Ordinary conversations still require Playing. Registered scripted choices

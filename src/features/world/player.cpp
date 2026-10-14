@@ -1,4 +1,5 @@
 #include "features/world/session.h"
+#include "features/world/menu_state.h"
 #include "platform/log.h"
 #include "platform/foreground.h"
 #include "engine/abi.h"
@@ -14,11 +15,8 @@ using engine::Array;
 bool GatePlayer(Session& session,Snapshot& s,uintptr_t& pawn) {
     session.liveController=session.liveWorld=session.liveFocus=0;
     if (!Discover(session)) { s.reason = "discovering bounded world metadata"; return false; }
-    for (uintptr_t m : session.menus) if (session.reflection.registry.Instance(m) && session.reflection.registry.IsA(m,"SensenMenuBase")) {
-        unsigned char opening = 0;
-        if (!session.reflection.Value(m, "SensenMenuBase", "OpeningState", "ByteProperty", opening) || opening != 0) {
-            s.reason = "pause, diary or out-game menu"; return false;
-        }
+    for (uintptr_t m : session.menus) if (BlockingMenu(session.reflection,m)) {
+        s.reason = "pause, diary or out-game menu"; return false;
     }
     uintptr_t controller = 0, world = 0;
     pawn = 0;

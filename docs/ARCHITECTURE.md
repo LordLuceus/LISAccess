@@ -4,6 +4,13 @@ Native offsets, validation, controls and announcement wording are independent
 of the output backend. Speech and braille now use a pinned, source-built x86
 Prism library; the migration does not add gameplay features or dialogue choices.
 
+Cached UObject addresses are not type identities: the engine can recycle a former
+menu address into scenery. `world/menu_state.h` revalidates `SensenMenuBase` before
+reading menu-only state. Dialogue and world blocking share this guard; diary
+discovery uses the same instance check. Genuine menus with unreadable state still
+block input. The regression includes the captured recycled actor and Alyssa's
+existing dialogue bindings, without adding an NPC-specific reader.
+
 ## Modules and ownership
 
 - **`bootstrap/`** owns DLL entry/export forwarding, executable verification
