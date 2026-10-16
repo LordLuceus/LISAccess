@@ -13,6 +13,60 @@ existing dialogue bindings, without adding an NPC-specific reader.
 
 ## Modules and ownership
 
+### Manual guided beacons
+
+`navigation/route_*` contains the engine-free flat-floor planner, calibrated body
+sweeps and manual waypoint follower. These reuse the pure geometry work from the
+shelved autowalk experiment, not its movement hooks, input observers or binding
+machinery. No autowalk source is part of this build.
+
+`guided_scene` refreshes the existing player/menu/control gates on the window
+thread and calls the existing verified `Actor.Trace` adapter. Fast refreshes reuse
+completed discovery metadata; normal world sampling still drives discovery. A
+route sample rejects changed identities, dimensions or player position during its
+queries, bounds queries and age, and latches native faults only for guidance.
+Navigation traces do not reproduce the native camera visibility check. Temporary
+per-query recording and actor-path dumps have been removed; pure planner state
+and failure reasons remain available to regression tests.
+Interactive goals use the authored inner-zone radius: positive FSM override,
+then positive actor override, then the interaction component's radius. Missing
+or invalid metadata rejects routing without hiding the scanner target. The
+radius is a strict XY bound, not a complete native focus predicate. The guide
+checks the floor route and standing-body clearance but does not cast an invented
+body-to-target visibility ray. Actual native focus plus action labels distinguish
+Arrived from Approach. Approach-only guidance can end across a wall or outside
+the required viewing angle; camera-aware endpoint selection is deferred pending
+player feedback, not an active research task.
+Exit goals retain the real trigger-volume extents rather than treating an elevated
+brush centre as a different floor. Reaching an exit requires actual volume
+membership, not merely proximity to its centre; it does not activate the exit.
+
+`guided_beacon` carries worker requests and copied results across a mutex mailbox.
+Native sampling runs outside that mutex on the game thread. Request generations
+prevent cancellation or selection changes during a query from publishing old
+waypoints. The existing 50-ms feedback timer advances guidance; the 200-ms world
+timer also advances it as a fallback. The worker rejects stale output and never
+calls the planner or engine. `beacon_control` owns device-specific announcements
+and consumes route results for audio; the direct-target setting bypasses routing.
+Reported route failures cancel planner work and latch announced direct-bearing
+fallback for that selection, with a one-second cue delay. Retargeting or toggling
+off/on clears fallback and retries. Inactive/blocked navigation and expired
+waypoint output still stop; fallback never reuses an obsolete waypoint.
+
+Planning permits 64 bookkeeping/probe operations per slice, still capped at
+1.5 ms (a running native callback cannot be preempted). The old eight-operation
+ceiling spread 10.6 ms of measured search work over 12.8 seconds. A worst-case
+slice needs one calibration trace plus three traces per operation: at most 193,
+statically checked against the unchanged 256-query native capture cap. Search
+order, overall limits and geometry checks are unchanged; slow callbacks still
+yield at the time limit. This is a scheduling improvement, not a new route solver.
+
+The route is advisory, not a movement command or guarantee of safety. Floor
+sampling cannot exclude sub-sample gaps; target and scanner data refresh less
+frequently than player geometry. Routes cover flat local terrain only. In-game
+coverage and waypoint ergonomics still need broader playtesting; initial indoor
+and outdoor approach-only playtests have been positive.
+
 - **`bootstrap/`** owns DLL entry/export forwarding, executable verification
   coordination, the window hook, timer and worker loop. It connects services and
   features; it must not collect their implementations.

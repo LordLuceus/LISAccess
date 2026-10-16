@@ -7,7 +7,7 @@ namespace lis::world {
 struct Vec3 { float x = 0, y = 0, z = 0; };
 enum class Kind { Object, Person, Destination, Exit };
 inline bool NeedsInteractionFocus(Kind kind) {return kind==Kind::Object||kind==Kind::Person;}
-struct Target { std::string stableId; std::wstring label; Vec3 position; Kind kind = Kind::Object; bool angleRestricted=false; };
+struct Target { std::string stableId; std::wstring label; Vec3 position; Kind kind = Kind::Object; bool angleRestricted=false; Vec3 volumeExtent; float approachRadius=0; };
 struct Action { std::wstring label; };
 struct Landmark { std::string actorPath; std::wstring label; };
 struct Probe { bool known = false, hit = false; float distance = 0, angle = 0; Vec3 normal; };

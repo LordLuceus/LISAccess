@@ -12,9 +12,9 @@ namespace lis::world {
 using engine::Copy;
 using engine::Read;
 using engine::Array;
-bool GatePlayer(Session& session,Snapshot& s,uintptr_t& pawn) {
+bool GatePlayer(Session& session,Snapshot& s,uintptr_t& pawn,bool refreshDiscovery) {
     session.liveController=session.liveWorld=session.liveFocus=0;
-    if (!Discover(session)) { s.reason = "discovering bounded world metadata"; return false; }
+    if (refreshDiscovery ? !Discover(session) : !session.ready) { s.reason = "discovering bounded world metadata"; return false; }
     for (uintptr_t m : session.menus) if (BlockingMenu(session.reflection,m)) {
         s.reason = "pause, diary or out-game menu"; return false;
     }

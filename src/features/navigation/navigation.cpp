@@ -1,6 +1,7 @@
 #include "features/navigation/navigation.h"
 #include "features/navigation/math.h"
 #include "features/navigation/description.h"
+#include "features/navigation/beacon_control.h"
 #include "features/world/world.h"
 #include "features/interactions/actions.h"
 #include "features/camera/facing.h"
@@ -25,7 +26,8 @@ std::mutex mutex;
 world::Snapshot latest;
 ULONGLONG stamp = 0;
 std::vector<world::Landmark> landmarks;
-bool configured = false, audioReady = false, obstacles = false, beacon = false;
+bool configured = false, audioReady = false, obstacles = false;
+BeaconControl beacon;
 bool wasActive = false, diagnostics = false, previewPending = false, warnedIncomplete = false;
 bool warnedInteractions=false,warnedExits=false;
 int preview = -1;
@@ -51,6 +53,7 @@ void Initialize(HMODULE module) {
     wchar_t path[32768]{}; GetModuleFileNameW(module,path,ARRAYSIZE(path));
     const auto ini=std::filesystem::path(path).parent_path()/L"LISAccess"/L"navigation.ini";
     obstacles=GetPrivateProfileIntW(L"Navigation",L"ObstacleCues",0,ini.c_str())!=0;
+    beacon.Configure(GetPrivateProfileIntW(L"Navigation",L"GuidedBeacons",1,ini.c_str())!=0);
     diagnostics=GetPrivateProfileIntW(L"Navigation",L"Diagnostics",0,ini.c_str())!=0;
     wchar_t volumeText[64]{};
     GetPrivateProfileStringW(L"Navigation",L"Volume",L"0.75",volumeText,ARRAYSIZE(volumeText),ini.c_str());
@@ -75,6 +78,8 @@ void Tick() {
     if(!configured) {world::SetLandmarks(landmarks);configured=true;}
     world::Snapshot sample;
     world::Sample(sample);
+    guidance::Observe(sample);
+    guidance::Tick(); // Also a bounded fallback if the faster feedback timer fails.
     int action=-1;std::string expected,face;
     {std::lock_guard<std::mutex> lock(mutex);action=pendingAction;pendingAction=-1;expected.swap(pendingFocus);face.swap(pendingFace);}
     std::wstring reply;bool submitted=false;
@@ -88,6 +93,7 @@ void Tick() {
     if(!reply.empty())feedback=std::move(reply);
     latest=std::move(sample);stamp=GetTickCount64();
 }
+void GuidanceTick(){guidance::Tick();}
 void Pump(bool foreground, bool readableMenu) {
     const auto now=GetTickCount64();
     auto pressed=devices.ReadKeyboard(foreground,now);
@@ -104,7 +110,7 @@ void Pump(bool foreground, bool readableMenu) {
     else if(std::any_of(pressed.begin(),pressed.end(),[](bool value){return value;})){s.gamepad=false;commandGamepad=false;}
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
     if(rewind::HandleInput(pressed,foreground,readableMenu,commandGamepad.value_or(false))||dialogue::HandleInput(pressed,foreground,readableMenu,commandGamepad)) {
-        audio::CancelPreview();audio::SetEnabled(false);previewPending=false;beacon=false;wasActive=false;
+        audio::CancelPreview();audio::SetEnabled(false);previewPending=false;beacon.Stop();wasActive=false;
         seenFocus.clear();spokenFocus.clear();aimingAt.clear();
         return;
     }
@@ -113,7 +119,7 @@ void Pump(bool foreground, bool readableMenu) {
     if(foreground&&s.exitsFailed&&!warnedExits){Speak(L"Exit-area scanning failed and has been disabled. Other scanner targets remain available.");warnedExits=true;}
     if(!foreground || (!active && !readableMenu)) {
         audio::CancelPreview();audio::SetEnabled(false);previewPending=false;
-        if(wasActive) beacon=false;
+        beacon.Stop();
         seenFocus.clear();spokenFocus.clear();
         aimingAt.clear();
         if(foreground && !readableMenu && (pressed[4]||pressed[5]||pressed[0]||pressed[1]||pressed[2]||pressed[3]))
@@ -121,7 +127,7 @@ void Pump(bool foreground, bool readableMenu) {
         wasActive=false;
         return;
     }
-    if(!active && wasActive) beacon=false;
+    if(!active && wasActive) beacon.Stop();
     wasActive=active;
     if(active) {
         if(!aimingAt.empty()) {
@@ -137,7 +143,7 @@ void Pump(bool foreground, bool readableMenu) {
         for(unsigned slot=0;slot<4;++slot)if(pressed[8+slot]) {
             if(!aimingAt.empty()||pressed[7])Speak(L"Wait for the target's focused-object announcement before choosing an action.");
             else if(s.focusedId.empty()||s.actions[slot].label.empty())Speak(L"That action is not available. Face an object to hear its actions.");
-            else {std::lock_guard<std::mutex> lock(mutex);pendingFocus=s.focusedId;pendingAction=static_cast<int>(slot);}
+            else {beacon.Stop();std::lock_guard<std::mutex> lock(mutex);pendingFocus=s.focusedId;pendingAction=static_cast<int>(slot);}
             break;
         }
     }
@@ -161,7 +167,10 @@ void Pump(bool foreground, bool readableMenu) {
     if(audio::PreviewPlaying())return;
     audio::CancelPreview();
     if(!active) {audio::SetEnabled(false);return;}
-    if(pressed[4]) Speak(L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. Control Home repeats the latest prompt. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. On a controller: D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face. Native Y, X, B and A keep their announced actions. F2 toggles obstacle cues; F3 previews sounds. Hold the left stick and press D pad down for obstacle cues, up for help, left for sound previews, or right to repeat the latest prompt. Beacons give direction, not a safe route. R remains rewind.");
+    if(pressed[4]) Speak(std::wstring(s.gamepad?
+        L"D pad left and right select targets, up describes, down toggles the beacon. Click the left stick to face the selected target. Y, X, B and A keep their announced actions. Hold the left stick and press D pad down for obstacle cues, up for help, left for sound previews, or right to repeat the latest prompt. ":
+        L"Page Up and Page Down select scanner targets. Home describes. Shift Home toggles the beacon. Control Home repeats the latest prompt. F faces the selected target. Number keys 1 through 4 activate the focused object's announced actions. F2 toggles obstacle cues; F3 previews sounds. R remains rewind. ")+
+        (beacon.Guided()?L"Guided beacons follow verified flat routes while you walk manually. They do not guarantee safety.":L"Beacons give direction only, not a clear route."));
     if(pressed[5]) {
         obstacles=!obstacles;
         if(obstacles && !audio::Available(audio::Cue::Obstacle)) {obstacles=false;Speak(L"Obstacle sound is unavailable.");}
@@ -172,7 +181,7 @@ void Pump(bool foreground, bool readableMenu) {
     // follows stableId across reordering rather than following the old index.
     auto current=std::find_if(s.targets.begin(),s.targets.end(),[&](const auto& t){return t.stableId==selected;});
     if(!selected.empty() && current==s.targets.end()) {
-        selected.clear();if(beacon) Speak(L"Target is no longer available. Beacon off.");beacon=false;
+        selected.clear();if(beacon.Enabled()) Speak(L"Target is no longer available. Beacon off.");beacon.Stop();
     }
     if(pressed[0]||pressed[1]) {
         if(s.targets.empty()) Speak(s.interactionStatus=="ready" ? L"No supported navigation targets here." : L"Interaction scanning is unavailable. No navigation landmarks here.");
@@ -180,6 +189,7 @@ void Pump(bool foreground, bool readableMenu) {
             int index=current==s.targets.end() ? (pressed[0] ? 0 : -1) : static_cast<int>(current-s.targets.begin());
             index=(index+(pressed[0] ? -1 : 1)+static_cast<int>(s.targets.size()))%static_cast<int>(s.targets.size());
             current=s.targets.begin()+index;selected=current->stableId;
+            beacon.Retarget(*current,now);
             Speak(Describe(s,*current));nextBeacon=now+650;
         }
     }
@@ -199,9 +209,12 @@ void Pump(bool foreground, bool readableMenu) {
     if(pressed[3]) {
         if(current==s.targets.end()) Speak(L"No target selected. Use Page Down to select one.");
         else if(!audio::Available(CueFor(current->kind))) Speak(L"The target sound is unavailable.");
-        else {beacon=!beacon;Speak(beacon ? L"Beacon on. Direction only, not a clear route." : L"Beacon off.");nextBeacon=now+800;}
+        else {Speak(beacon.Toggle(*current,now));nextBeacon=now+800;}
     }
-    audio::SetEnabled(audioReady && (obstacles||beacon));
+    BeaconOutput targetCue;
+    if(current!=s.targets.end())targetCue=beacon.Update(s,*current,now);
+    if(!targetCue.speech.empty())Speak(targetCue.speech);
+    audio::SetEnabled(audioReady && (obstacles||beacon.Enabled()));
     if(diagnostics && now>=logAt) {
         std::string detail="event=navigation_sample x="+std::to_string(s.player.x)+" y="+std::to_string(s.player.y)+" z="+std::to_string(s.player.z)+" yaw="+std::to_string(s.cameraYaw)+" targets="+std::to_string(s.targets.size());
         for(size_t i=0;i<s.probes.size();++i) detail+=" p"+std::to_string(i)+"="+std::to_string(s.probes[i].known)+","+std::to_string(s.probes[i].hit)+","+std::to_string(s.probes[i].distance);
@@ -220,11 +233,11 @@ void Pump(bool foreground, bool readableMenu) {
         else if(nearest) {audio::Play(audio::Cue::Obstacle,navmath::Pan(nearest->angle),1);nextObstacle=now+navmath::Interval(nearest->distance,s.radius*6);}
         else nextObstacle=now+200;
     }
-    if(beacon && current!=s.targets.end() && now>=nextBeacon) {
-        const float bearing=Bearing(s,*current);
+    if(beacon.Enabled() && targetCue.audible && current!=s.targets.end() && now>=nextBeacon) {
+        const float bearing=targetCue.bearing;
         audio::Play(CueFor(current->kind),navmath::Pan(bearing),.85f,navmath::Behind(bearing) ? .72f : 1.f);
-        nextBeacon=now+navmath::Interval(Distance(s,*current),s.radius*50);
+        nextBeacon=now+navmath::Interval(targetCue.distance,targetCue.radius*50);
     }
 }
-void Shutdown() {audio::Shutdown();devices.Shutdown();}
+void Shutdown() {beacon.Stop();guidance::Shutdown();audio::Shutdown();devices.Shutdown();}
 }

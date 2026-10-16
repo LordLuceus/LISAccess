@@ -82,6 +82,7 @@ void Interactions(Session& session,Snapshot& s) {
         if(raw.empty())continue;
         Target target;target.stableId=session.reflection.registry.Path(actor);target.label=session.localization.Translate(session.reflection.registry,session.base,session.localize,session.liveController,raw);target.angleRestricted=eligibility==1;target.position=position;
         if(target.stableId.empty())continue;
+        interaction::ReadApproachRadius(std::cref(session.reflection),actor,component,target.approachRadius);
         uintptr_t object=0;
         // This game also represents NPCs as SkeletalMeshActorMAT, not Pawns.
         // Its authored Chara localization namespace identifies those names in

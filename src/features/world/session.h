@@ -22,7 +22,9 @@ struct Session {
 Session& GameSession();
 bool EqualPath(const std::string& a,const std::string& b);
 bool Discover(Session& session);
-bool GatePlayer(Session& session,Snapshot& snapshot,uintptr_t& pawn);
+// Normal sampling owns incremental discovery. Fast guidance refreshes may reuse
+// completed metadata without running another registry scan.
+bool GatePlayer(Session& session,Snapshot& snapshot,uintptr_t& pawn,bool refreshDiscovery=true);
 bool SafeSample(Session& session,Snapshot& snapshot);
 inline bool ValidArray(const engine::Array& a,int maximum) {return a.count>=0&&a.count<=maximum&&a.capacity>=a.count&&(!a.count||a.data>=0x10000);}
 }

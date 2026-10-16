@@ -58,6 +58,10 @@ add_library(lis_features OBJECT
     src/features/navigation/collision.cpp
     src/features/navigation/description.cpp
     src/features/navigation/navigation.cpp
+    src/features/navigation/beacon_control.cpp
+    src/features/navigation/guided_beacon.cpp
+    src/features/navigation/guided_scene.cpp
+    src/features/navigation/route_guide.cpp
     src/features/navigation/world_sample.cpp
     src/features/world/discovery.cpp
     src/features/world/player.cpp
@@ -99,6 +103,18 @@ lis_test(dialogue_test dialogue_policy tests/dialogue_test.cpp)
 lis_test(scripted_choices_test scripted_choices tests/scripted_choices_test.cpp)
 lis_test(dialogue_lifecycle_test dialogue_lifecycle tests/dialogue_lifecycle_test.cpp src/features/dialogue/dialogue.cpp)
 lis_test(navigation_test navigation_geometry tests/navigation_test.cpp)
+lis_test(route_guide_test route_guide tests/route_guide_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_approach_test route_approach tests/route_approach_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_exit_test route_exit tests/route_exit_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_diagnostic_test route_diagnostic tests/route_diagnostic_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_zone_test route_zone tests/route_zone_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_scheduling_test route_scheduling tests/route_scheduling_test.cpp src/features/navigation/route_guide.cpp)
+lis_test(route_geometry_test route_geometry tests/route_geometry_test.cpp)
+lis_test(route_planner_test route_planner tests/route_planner_test.cpp)
+lis_test(route_routing_test route_routing tests/route_routing_test.cpp)
+lis_test(guided_beacon_runtime_test guided_beacon_runtime tests/guided_beacon_runtime_test.cpp)
+lis_test(guided_scene_test guided_scene tests/guided_scene_test.cpp)
+lis_test(beacon_control_test beacon_control tests/beacon_control_test.cpp src/features/navigation/beacon_control.cpp)
 lis_test(target_list_test scanner_target_list tests/target_list_test.cpp)
 lis_test(exit_areas_test exit_areas tests/exit_areas_test.cpp src/features/navigation/description.cpp)
 lis_test(journal_reader_test journal_reader tests/journal_reader_test.cpp)

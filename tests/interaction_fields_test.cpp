@@ -1,6 +1,7 @@
 #include "features/interactions/fields.h"
 #include <cstring>
 #include <iostream>
+#include <limits>
 
 namespace {
 // Minimal descriptor/value fixtures from the captured classroom metadata, not
@@ -35,5 +36,29 @@ int main() {
     if(!lis::interaction::ReadObjectLabel(reader,resolve,0x20000).empty())return 6;
     reader.available=false;
     if(lis::interaction::ReadComponent(reader,0x10000,component)||!lis::interaction::ReadObjectLabel(reader,resolve,0x20000).empty())return 7;
+    // Real shipped Mail_63 / AnsweringMachine_79 overrides are 100, not the
+    // discarded universal 72. Remaining values below exercise precedence.
+    float fsm=-1,authored=100,defaultRadius=80,radius=999;const char* missing="";
+    auto zone=[&](uintptr_t object,const char* owner,const char* name,const char* type,float& out) {
+        if(std::strcmp(type,"FloatProperty")||!std::strcmp(name,missing))return false;
+        if(object==1&&!std::strcmp(owner,"WhatIfInteractionActor")) {
+            if(!std::strcmp(name,"FSMOverrideInnerZoneRadius")){out=fsm;return true;}
+            if(!std::strcmp(name,"OverrideInnerZoneRadius")){out=authored;return true;}
+        }
+        if(object==2&&!std::strcmp(owner,"DNEWhatIfInteractionComponent")&&!std::strcmp(name,"InnerZoneRadius")){out=defaultRadius;return true;}
+        return false;
+    };
+    auto readZone=[&]{return lis::interaction::ReadApproachRadius(zone,1,2,radius);};
+    if(!readZone()||radius!=100)return 8;
+    fsm=120;missing="OverrideInnerZoneRadius";
+    if(!readZone()||radius!=120)return 9; // overridden inputs are not required
+    missing="";fsm=0;authored=-1;
+    if(!readZone()||radius!=80)return 10;
+    defaultRadius=0;
+    if(readZone()||radius!=0)return 11;
+    defaultRadius=80;missing="FSMOverrideInnerZoneRadius";
+    if(readZone()||radius!=0)return 12;
+    missing="";fsm=std::numeric_limits<float>::quiet_NaN();
+    if(readZone()||radius!=0)return 13;
     std::cout<<"PASS: captured component/FName contracts, both old-type regressions, suffix and unavailable reads\n";
 }

@@ -19,6 +19,7 @@ int main() {
     const std::string id="e1_2a_corridor_ld.TheWorld.PersistentLevel.DNEVolume_5";
     world::Snapshot snapshot;
     check(exits::AddDestination(snapshot,id,label,bounds)&&snapshot.targets.size()==1,"authored campus area becomes an exit target");
+    check(snapshot.targets[0].volumeExtent.x==bounds.extent.x&&snapshot.targets[0].volumeExtent.y==bounds.extent.y&&snapshot.targets[0].volumeExtent.z==bounds.extent.z,"route guidance retains actual exit-volume extents, not just its elevated centre");
     check(snapshot.targets[0].position.y< -3000&&std::fabs(snapshot.targets[0].position.y-(-2799.48999f))>300,
           "target is inside the actual region rather than at the outside brush pivot");
     check(snapshot.targets[0].kind==world::Kind::Exit&&!world::NeedsInteractionFocus(world::Kind::Exit),"exit does not promise ordinary-object focus or pitch aiming");

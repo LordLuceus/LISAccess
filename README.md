@@ -15,6 +15,10 @@ Files text views and world-object inspection have passed their initial playtest.
 This is not complete gameplay accessibility, and silence never means that an area
 is safe.
 
+**Experimental guided beacons** can now lead you along verified local flat routes
+while you walk manually. Automatic walking is not included. The existing scanner,
+manual movement and optional direct-target beacons remain available.
+
 ## Licence and sound assets
 
 LISAccess's original code and documentation are licensed under the
@@ -288,7 +292,7 @@ to the camera, not Max's body orientation.
 | F2 | Toggle obstacle proximity cues; initially off |
 | Page Down / Page Up | Select next / previous scanner target; hold to repeat |
 | Home | Read the gauge while rewinding; otherwise describe the selected target or focused-object actions |
-| Shift+Home | Toggle the selected target's directional beacon |
+| Shift+Home | Toggle the selected target's guided beacon (experimental) |
 | Ctrl+Home | Read the gauge while rewinding; otherwise repeat the latest tutorial/HUD prompt or rewind readout |
 | F | Request camera facing toward the selected target |
 | Number row 1, 2, 3, 4 | Use the focused object's announced action; equivalents of controller Y, X, B, A |
@@ -308,7 +312,7 @@ menu is active or visible, since it also uses the D-pad.
 |---|---|
 | D-pad left / right | Previous / next scanner target; hold to repeat |
 | D-pad up | Read the gauge while rewinding; otherwise describe the selected target or focused-object actions |
-| D-pad down | Toggle the selected target's beacon |
+| D-pad down | Toggle the selected target's guided beacon (experimental) |
 | Click the left stick | Face the selected target on button release |
 | Hold left-stick click + D-pad down | Toggle obstacle cues |
 | Hold left-stick click + D-pad up | Read help |
@@ -377,11 +381,65 @@ The successful classroom test does not prove every action or camera mode.
 
 ### Beacons and obstacles
 
-The initial destination is **Lighthouse approach**, attached to an authored
-opening-scene trigger. Its beacon is a bearing to that point, **not a walkable
-route**. Turn and choose your way around obstacles yourself. The beacon pans left
-or right; a lower pitch means the target is behind the camera. Speech gives broad
-distance and elevation descriptions without claiming an unverified metre scale.
+#### Guided beacons (experimental)
+
+Select a scanner target and turn its beacon on with **Shift+Home** or **D-pad down**.
+The mod says it is finding a route. Once a route is ready, follow the sound while
+walking and turning yourself. It sounds from the next waypoint, not straight
+through obstacles toward the final target. The waypoint advances as you walk;
+leaving the route, a moving target or a new obstruction can trigger replanning.
+No route cue plays while the route is being checked.
+
+If routing reports that it cannot verify a route, the mod announces **"Switching
+to direct target"** and resumes the original direction-only beacon. This points
+toward the target, not around obstacles; it does not mean the way is clear.
+The switch is announced once, with a brief pause before direct cues begin.
+Selecting another target or switching the beacon off and on retries routing.
+Menus, loss of focus and stale navigation data still stop the beacon rather than
+falling back.
+
+The sound pans left or right relative to the camera. A lower pitch means the
+waypoint is behind you, and pulses become quicker as you approach it. Person,
+object and destination sounds still identify the selected target's kind. You can
+stop walking to listen without a movement timeout cancelling the route.
+
+For an interactive target, guidance checks a walkable route to a standing point
+inside that object's game-defined approach area. If the
+interaction is not already available, the mod says you are near the target and
+reminds you to use **F** or **left-stick click** to face it, or aim manually. It
+does not turn the camera or activate anything automatically. The normal focused
+object announcement still supplies the available actions. Reaching an exit area's
+location does not activate its scene-change prompt for you.
+
+**An approach is not a guarantee that you can see or interact with the target.**
+The route does not predict the game's camera view. It can sometimes end on the
+wrong side of a wall, or where you still need to change your position or angle.
+Wait for the game's focused-object announcement and available actions before
+trying to interact. This approach-only behaviour is experimental; please report
+when it does not bring you somewhere useful.
+
+This first version supports **local flat routes**, not stairs, slopes or general
+multi-level navigation. Search distance and work are bounded. Unsupported terrain,
+unreadable collision information and unsuccessful searches are reported rather
+than described as a clear route. Floor checks sample the route: gaps smaller than
+their spacing can be missed, and moving obstacles can change between checks.
+Keep using your normal movement judgement and obstacle cues where useful.
+
+The initial **Lighthouse approach** destination is on uneven opening-scene terrain;
+it is not evidence that route guidance supports the cliff path. Direct-target
+guidance remains available through the setting below.
+
+> Route-following guidance is experimental. Initial indoor and outdoor playtests
+> have been positive, but waypoint spacing, arrival behaviour and cue timing may
+> change based on feedback. The existing scanner and direct-target beacon are
+> separate from this new route-following behaviour.
+
+#### Direct beacons and obstacle cues
+
+Set `GuidedBeacons=0` to retain the original beacon: a bearing to the selected
+target, **not a walkable route**. Its lower pitch means the target is behind the
+camera. Speech continues to describe the final target's distance and elevation;
+it does not read raw coordinates or claim an unverified metre scale.
 
 Obstacle cues use short, partial-body collision sweeps ahead, ahead-left and
 ahead-right. The nearest detected obstruction determines pan and pulse rate;
@@ -407,6 +465,9 @@ rather than claiming that no targets exist.
 
 The game directory's `Binaries\Win32\LISAccess\navigation.ini` sets default
 obstacle-cue state and `Volume` (0.0 to 1.0), shared by navigation and rewind cues.
+`GuidedBeacons=1` enables route-guided beacons and is the default, including when
+the setting is absent from an older configuration. Set it to `0` for the original
+direct-target bearings. Restart the game after changing the setting.
 F2 changes the current session's obstacle cues only; it does not toggle rewind cues.
 Keep `Diagnostics=0` except when collecting a requested development log.
 

@@ -25,7 +25,7 @@ UINT_PTR rewindTimer = 0;
 std::atomic<bool> failed{false};
 std::wstring localDirectory;
 
-void CALLBACK RewindTimerProc(HWND,UINT,UINT_PTR,DWORD){rewind::Tick();}
+void CALLBACK RewindTimerProc(HWND,UINT,UINT_PTR,DWORD){rewind::Tick();navigation::GuidanceTick();}
 
 void CALLBACK TimerProc(HWND, UINT, UINT_PTR, DWORD) {
     prompts::Tick();

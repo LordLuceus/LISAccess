@@ -1,5 +1,29 @@
 # LISAccess changelog
 
+## 2026-10-16 — Guided manual navigation
+
+- **Guided beacons (experimental):** the existing beacon control now finds a local
+  flat route and sounds from successive waypoints while you walk manually, instead
+  of pointing straight at the target through intervening obstacles. It advances
+  as you walk and can recheck the route after you leave it or conditions change.
+- Finding and rechecking routes now does more work per update, reducing needless
+  waiting between updates without relaxing the route's collision checks.
+- Guidance uses each object's game-defined approach area rather than requiring
+  an unnecessarily close position or rejecting it with an inaccurate visibility
+  check. Reaching an approach point is not the same as having an interaction
+  available: you may still need to face the object or change your position.
+  It can sometimes stop on the wrong side of a wall. It never walks, turns the
+  camera or activates an object for you.
+  Stairs, slopes and general multi-level routes are not supported by this first
+  version; unsuccessful or unavailable routing is announced explicitly.
+- When a route cannot be verified, the beacon announces its switch to direct-target
+  guidance rather than going silent. Direct guidance is only a bearing, not a
+  clear route. Selecting another target or toggling the beacon off and on retries
+  routing; menus, focus loss and stale navigation data still stop it.
+- The original direct-target beacon remains available with `GuidedBeacons=0` in
+  `navigation.ini`. Scanner selection and obstacle cues retain their existing
+  controls. Route-following behaviour still needs in-game feedback and may change.
+
 ## 2026-10-14 — Rewind marker feedback
 
 - Added a short approach cue and a distinct reached/passed cue for the last-action

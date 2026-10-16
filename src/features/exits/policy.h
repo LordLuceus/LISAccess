@@ -3,6 +3,7 @@
 #include "features/menus/narration.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace lis::exits {
 struct Bounds {world::Vec3 origin,extent;float radius;};
@@ -33,6 +34,7 @@ inline bool AddDestination(world::Snapshot& s,const std::string& id,const std::w
     if(std::any_of(s.targets.begin(),s.targets.end(),[&](const auto& t){return t.stableId==id;}))return false;
     // Actor.Location is only the brush pivot. For the corridor exit it is
     // OUTSIDE its volume. The engine's world-space bounds locate the real area.
-    s.targets.push_back({id,label,bounds.origin,world::Kind::Exit});return true;
+    world::Target target{id,label,bounds.origin,world::Kind::Exit};
+    target.volumeExtent=bounds.extent;s.targets.push_back(std::move(target));return true;
 }
 }
