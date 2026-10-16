@@ -2,6 +2,7 @@
 #include "features/navigation/math.h"
 #include "features/navigation/description.h"
 #include "features/navigation/beacon_control.h"
+#include "features/navigation/face_reply.h"
 #include "features/world/world.h"
 #include "features/interactions/actions.h"
 #include "features/camera/facing.h"
@@ -38,6 +39,9 @@ int pendingAction=-1;
 std::string pendingFocus,pendingFace,seenFocus,spokenFocus;
 std::string aimingAt,faceReply;
 bool faceSubmitted=false;
+bool pendingCancelFace=false;
+FaceReplies faceReplies; // Worker-only; only copied tokens cross the mutex.
+uint64_t pendingFaceToken=0,faceReplyToken=0,activeFaceToken=0;
 ULONGLONG aimDeadline=0;
 std::wstring feedback;
 ULONGLONG focusSince=0;
@@ -46,6 +50,13 @@ std::string Utf8(const std::wstring& text) {
     std::string s(n,'\0');
     if(n) WideCharToMultiByte(CP_UTF8,0,text.data(),static_cast<int>(text.size()),s.data(),n,nullptr,nullptr);
     return s;
+}
+void CancelAim() {
+    faceReplies.Advance();
+    aimingAt.clear();
+    std::lock_guard<std::mutex> lock(mutex);
+    pendingCancelFace=true;
+    pendingFace.clear();
 }
 }
 void Initialize(HMODULE module) {
@@ -80,16 +91,23 @@ void Tick() {
     world::Sample(sample);
     guidance::Observe(sample);
     guidance::Tick(); // Also a bounded fallback if the faster feedback timer fails.
-    int action=-1;std::string expected,face;
-    {std::lock_guard<std::mutex> lock(mutex);action=pendingAction;pendingAction=-1;expected.swap(pendingFocus);face.swap(pendingFace);}
+    int action=-1;std::string expected,face,completed;bool cancel=false;uint64_t faceToken=0;
+    {std::lock_guard<std::mutex> lock(mutex);action=pendingAction;pendingAction=-1;expected.swap(pendingFocus);face.swap(pendingFace);cancel=pendingCancelFace;pendingCancelFace=false;faceToken=pendingFaceToken;}
     std::wstring reply;bool submitted=false;
+    if(cancel||action>=0||!face.empty())world::CancelFacing();
     if(action>=0) {
         reply=world::ActivateFocused(expected,static_cast<unsigned>(action));
         sample.focusedId.clear();sample.focusedLabel.clear();sample.actions={};
     }
-    else if(!face.empty())reply=world::FaceTarget(face,submitted);
+    else if(!face.empty()) {
+        activeFaceToken=faceToken;
+        reply=world::FaceTarget(face,submitted);
+    }
+    else reply=world::TickFacing(sample,completed);
     std::lock_guard<std::mutex> lock(mutex);
-    if(!face.empty()){faceReply=face;faceSubmitted=submitted;}
+    if(action>=0){faceReply.clear();faceReplyToken=0;}
+    else if(!face.empty()){faceReply=face;faceSubmitted=submitted;faceReplyToken=activeFaceToken;}
+    else if(!completed.empty()){faceReply=completed;faceSubmitted=false;faceReplyToken=activeFaceToken;}
     if(!reply.empty())feedback=std::move(reply);
     latest=std::move(sample);stamp=GetTickCount64();
 }
@@ -98,12 +116,14 @@ void Pump(bool foreground, bool readableMenu) {
     const auto now=GetTickCount64();
     auto pressed=devices.ReadKeyboard(foreground,now);
     world::Snapshot s;ULONGLONG at=0;
-    std::wstring reply;std::string completedFace;bool submitted=false;
-    {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;reply.swap(feedback);completedFace.swap(faceReply);submitted=faceSubmitted;}
+    std::wstring reply;std::string completedFace;bool submitted=false;uint64_t replyToken=0;
+    {std::lock_guard<std::mutex> lock(mutex);s=latest;at=stamp;reply.swap(feedback);completedFace.swap(faceReply);submitted=faceSubmitted;replyToken=faceReplyToken;}
+    if(!completedFace.empty()&&!faceReplies.Current(replyToken)){reply.clear();completedFace.clear();}
     if(completedFace==aimingAt&&!submitted)aimingAt.clear();
-    if(foreground&&!reply.empty())Speak(reply);
     const bool fresh=at && now-at<=450;
     const bool active=foreground && fresh && s.active && !s.interactionBusy && !readableMenu;
+    if(foreground&&!reply.empty()&&(completedFace.empty()||active))Speak(reply);
+    if(!active)CancelAim();
     const auto padPresses=devices.ReadController(s.controllerIndex,active||(foreground&&!readableMenu&&(dialogue::HasContext()||rewind::HasContext())),now,foreground&&!readableMenu);
     std::optional<bool> commandGamepad;
     if(std::any_of(padPresses.begin(),padPresses.end(),[](bool value){return value;})){s.gamepad=true;commandGamepad=true;}
@@ -111,7 +131,7 @@ void Pump(bool foreground, bool readableMenu) {
     for(size_t i=0;i<input::Count;++i)pressed[i]=pressed[i]||padPresses[i];
     if(rewind::HandleInput(pressed,foreground,readableMenu,commandGamepad.value_or(false))||dialogue::HandleInput(pressed,foreground,readableMenu,commandGamepad)) {
         audio::CancelPreview();audio::SetEnabled(false);previewPending=false;beacon.Stop();wasActive=false;
-        seenFocus.clear();spokenFocus.clear();aimingAt.clear();
+        seenFocus.clear();spokenFocus.clear();CancelAim();
         return;
     }
     if(foreground&&!readableMenu&&pressed[static_cast<size_t>(input::Command::RepeatPrompt)])prompts::RequestRepeat();
@@ -121,7 +141,7 @@ void Pump(bool foreground, bool readableMenu) {
         audio::CancelPreview();audio::SetEnabled(false);previewPending=false;
         beacon.Stop();
         seenFocus.clear();spokenFocus.clear();
-        aimingAt.clear();
+        CancelAim();
         if(foreground && !readableMenu && (pressed[4]||pressed[5]||pressed[0]||pressed[1]||pressed[2]||pressed[3]))
             Speak(L"Navigation unavailable here. No collision guidance is available.");
         wasActive=false;
@@ -132,12 +152,12 @@ void Pump(bool foreground, bool readableMenu) {
     if(active) {
         if(!aimingAt.empty()) {
             if(s.focusedId==aimingAt)aimingAt.clear();
-            else if(now>=aimDeadline){Speak(L"That target did not become focused. Try moving closer or aiming manually.");aimingAt.clear();}
+            else if(now>=aimDeadline){Speak(L"Facing stopped before interaction focus was confirmed.");CancelAim();}
         }
         std::string signature=s.focusedId;
         if(!signature.empty())signature+='|'+Utf8(FocusText(s));
         if(signature!=seenFocus){seenFocus=signature;focusSince=now;if(signature.empty())spokenFocus.clear();}
-        if(!seenFocus.empty()&&spokenFocus!=seenFocus&&now-focusSince>=200&&std::none_of(pressed.begin(),pressed.end(),[](bool value){return value;})) {
+        if(aimingAt.empty()&&reply.empty()&&!seenFocus.empty()&&spokenFocus!=seenFocus&&now-focusSince>=200&&std::none_of(pressed.begin(),pressed.end(),[](bool value){return value;})) {
             Speak(FocusText(s));spokenFocus=seenFocus;
         }
         for(unsigned slot=0;slot<4;++slot)if(pressed[8+slot]) {
@@ -181,9 +201,11 @@ void Pump(bool foreground, bool readableMenu) {
     // follows stableId across reordering rather than following the old index.
     auto current=std::find_if(s.targets.begin(),s.targets.end(),[&](const auto& t){return t.stableId==selected;});
     if(!selected.empty() && current==s.targets.end()) {
+        CancelAim();
         selected.clear();if(beacon.Enabled()) Speak(L"Target is no longer available. Beacon off.");beacon.Stop();
     }
     if(pressed[0]||pressed[1]) {
+        CancelAim();
         if(s.targets.empty()) Speak(s.interactionStatus=="ready" ? L"No supported navigation targets here." : L"Interaction scanning is unavailable. No navigation landmarks here.");
         else {
             int index=current==s.targets.end() ? (pressed[0] ? 0 : -1) : static_cast<int>(current-s.targets.begin());
@@ -202,8 +224,9 @@ void Pump(bool foreground, bool readableMenu) {
     if(pressed[7]) {
         if(current==s.targets.end())Speak(L"No target selected. Select one first.");
         else {
-            if(world::NeedsInteractionFocus(current->kind)&&current->stableId!=s.focusedId){aimingAt=current->stableId;aimDeadline=now+1500;}
-            std::lock_guard<std::mutex> lock(mutex);pendingAction=-1;pendingFocus.clear();pendingFace=current->stableId;
+            const auto token=faceReplies.Advance();
+            if(world::NeedsInteractionFocus(current->kind)&&current->stableId!=s.focusedId){aimingAt=current->stableId;aimDeadline=now+4500;}
+            std::lock_guard<std::mutex> lock(mutex);pendingAction=-1;pendingFocus.clear();pendingFace=current->stableId;pendingFaceToken=token;
         }
     }
     if(pressed[3]) {

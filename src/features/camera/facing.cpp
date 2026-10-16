@@ -1,79 +1,109 @@
 #include "features/camera/facing.h"
-#include "features/world/session.h"
-#include "platform/log.h"
+#include "features/camera/facing_native.h"
 #include "platform/foreground.h"
 #include "engine/abi.h"
 #include "engine/build_profile.h"
-#include "features/navigation/collision.h"
-#include <algorithm>
-#include <cmath>
-#include <cctype>
 namespace lis::world {
-using engine::Copy;
-using engine::Read;
-using engine::Array;
-struct Rotator {int pitch=0,yaw=0,roll=0;};
-int SignedRotation(int angle) {return static_cast<int16_t>(static_cast<uint32_t>(angle)&65535u);}
-bool RequestCameraRotation(Session& session,uintptr_t behaviour,Rotator rotation) {
+namespace {
+using namespace facing_policy;
+struct Attempt {
+    Policy policy;
+    facing_native::NativeFrame identity;
+    std::string id;
+    std::wstring label;
+    bool pitch=false;
+};
+Attempt attempt;
+std::string cancelled;
+bool OnThread(){return GameSession().thread==GetCurrentThreadId();}
+bool Ready(){auto& s=GameSession();return OnThread()&&IsGameForeground()&&s.ready&&!s.faulted&&!s.faceFaulted;}
+bool RequestCameraRotation(Session& session,uintptr_t behaviour,Rotation rotation) {
     __try {
-        if(!session.reflection.registry.Registered(session.faceFunction)||Read<uint16_t>(session.faceFunction+0xa2)!=16||Read<uint16_t>(session.faceFunction+0x94)!=0 ||
-            Read<uintptr_t>(Read<uintptr_t>(behaviour)+72*4)!=session.base+engine::profile::ObjectDispatch)return false;
-        struct Params {uint32_t activate;Rotator rotation;} p{1,rotation};
+        if(!session.reflection.registry.Registered(session.faceFunction)||facing_native::NativeRead<uint16_t>(session.faceFunction+0xa2)!=16||facing_native::NativeRead<uint16_t>(session.faceFunction+0x94)!=0||
+            facing_native::NativeRead<uintptr_t>(facing_native::NativeRead<uintptr_t>(behaviour)+72*4)!=session.base+engine::profile::ObjectDispatch)return false;
+        struct Params {uint32_t activate;Rotation rotation;} p{1,rotation};
         static_assert(sizeof(Params)==16);
         reinterpret_cast<engine::ProcessEvent>(session.base+engine::profile::ObjectDispatch)(reinterpret_cast<void*>(behaviour),reinterpret_cast<void*>(session.faceFunction),&p,nullptr);
         return true;
     } __except(EXCEPTION_EXECUTE_HANDLER){session.faceFaulted=true;return false;}
 }
+bool Submit(const facing_native::NativeFrame& native) {
+    const auto& v=native.frame;const auto& a=attempt.policy.aim;
+    try {
+        if(!RequestCameraRotation(GameSession(),native.behaviour.address,a.wanted))return false;
+    }catch(...){GameSession().faceFaulted=true;return false;}
+    attempt.policy.Submitted(v);return true;
+}
+std::wstring Finish(Result result,std::string& completed) {
+    completed=attempt.id;
+    const auto label=attempt.label;
+    const bool applied=attempt.policy.applied,pitch=attempt.pitch;
+    attempt={};
+    if(result==Result::Focused||result==Result::Cancelled)return {}; // native action narration owns success
+    if(!pitch&&result==Result::Aligned)return applied?L"Turned toward "+label+L".":L"Already facing "+label+L".";
+    if(applied)return L"Turned toward "+label+(pitch?L", but it is not focused.":L", but direction alignment is incomplete.");
+    return L"Could not finish turning toward "+label+L".";
+}
+bool Observe(const Snapshot& snapshot,const Target& target,facing_native::NativeFrame& native) {
+    if(!facing_native::Read(GameSession(),target.stableId,attempt.identity.target,native,NeedsInteractionFocus(target.kind)))return false;
+    native.frame.now=GetTickCount64();
+    native.frame.pitch=NeedsInteractionFocus(target.kind);
+    // Non-interaction targets retain their sampled direction point (e.g. exit volumes).
+    if(!native.frame.pitch)native.frame.target=target.position;
+    native.frame.focused=native.frame.pitch&&snapshot.focusedId==target.stableId;
+    return true;
+}
+}
+void CancelFacing() {
+    if(!OnThread())return;
+    if(!attempt.id.empty())cancelled=attempt.id;
+    attempt={}; // never call the native setter with activate=false
+}
+bool FacingActive(){return OnThread()&&attempt.policy.running;}
 std::wstring FaceTarget(const std::string& expectedTarget,bool& submitted) {
-    auto& session=GameSession();
-    // EXPERIMENTAL (2026-10-12): explicit normal-camera request only. Native
-    // collision/offsets may prevent focus; submission is not proof of arrival.
     submitted=false;
-    if(session.thread!=GetCurrentThreadId()||!IsGameForeground()||session.faulted||session.faceFaulted)return L"Facing unavailable here.";
+    if(!OnThread())return L"Facing unavailable here.";
+    CancelFacing();
+    cancelled.clear(); // the caller is synchronously replacing the previous request
+    if(!Ready())return L"Facing unavailable here.";
     Snapshot fresh;
-    if(!SafeSample(session,fresh)||fresh.interactionBusy)return L"Facing unavailable while the camera controls are locked.";
+    if(!SafeSample(GameSession(),fresh)||!fresh.active||fresh.interactionBusy)return L"Facing unavailable while the camera controls are locked.";
     auto target=std::find_if(fresh.targets.begin(),fresh.targets.end(),[&](const Target& t){return t.stableId==expectedTarget;});
     if(target==fresh.targets.end())return L"That target is no longer available.";
     if(target->stableId==fresh.focusedId)return L"Already focused on "+target->label+L".";
-    uintptr_t camera=0,behaviour=0;Array behaviours{};
-    if(!session.reflection.Value(session.liveController,"WhatIfController","ExCamera","ObjectProperty",camera)||!session.reflection.registry.Instance(camera) ||
-        !session.reflection.Value(camera,"WhatIfCamera","GameplayCameraBehaviours","ArrayProperty",behaviours)||!ValidArray(behaviours,32))return L"Camera mode unavailable.";
-    for(int i=0;i<behaviours.count;++i) {
-        uintptr_t candidate=Read<uintptr_t>(behaviours.data+i*4);
-        if(!session.reflection.registry.Instance(candidate)||!session.reflection.BoolIsSet(candidate,"CameraBehaviour","bActive"))continue;
-        // Do not take over fixed, dialogue, derived or blended camera behaviours.
-        if(behaviour||session.reflection.registry.ClassOf(candidate)!="CBA_3RD_Basic")return L"Facing is unavailable in this camera mode.";
-        behaviour=candidate;
+    facing_native::NativeFrame native;
+    if(!Observe(fresh,*target,native))return native.error;
+    if(native.frame.forced||native.frame.remaining>0)return L"Wait for the camera to finish moving.";
+    if(Distance(native.frame.origin,native.frame.target)<1)return L"The target is too close to aim at.";
+    attempt.id=target->stableId;attempt.label=target->label;attempt.pitch=NeedsInteractionFocus(target->kind);attempt.identity=native;
+    attempt.policy.Begin(native.frame);
+    const auto result=attempt.policy.Step(native.frame);
+    if(result!=Result::Request) {
+        std::string completed;
+        if(result==Result::Aligned&&attempt.pitch) {attempt={};return L"Already looking toward "+target->label+L", but it is not focused.";}
+        return Finish(result,completed);
     }
-    if(!behaviour||session.reflection.BoolIsSet(behaviour,"CBA_3RD_Basic","bWantNextCameraRotationForced"))return L"Wait for the camera to finish moving.";
-    uintptr_t settings=0;Rotator down{},up{},gameRotation{},viewRotation{};Vec3 view{};
-
-    int low=0,high=0,boundary=0,cache=0,pov=0,position=0,rotation=0;
-    if(!session.reflection.Value(behaviour,"CBA_3RD_Basic","CurPOVSettings","ObjectProperty",settings)||!session.reflection.registry.Instance(settings) ||
-        !session.reflection.StructOffset("CBPOVSettings","SettingsLookDown",low)||!session.reflection.StructOffset("CBPOVSettings","SettingsLookUp",high) ||
-        !session.reflection.Offset("SCameraPOVSettings","PitchBoundary","StructProperty",12,boundary) ||
-        !Copy(&down,settings+low+boundary,12)||!Copy(&up,settings+high+boundary,12) ||
-        !session.reflection.StructOffset("Camera","CameraCache",cache)||!session.reflection.StructOffset("TCameraCache","POV",pov) ||
-        !session.reflection.Offset("TPOV","Location","StructProperty",12,position)||!session.reflection.Offset("TPOV","Rotation","StructProperty",12,rotation) ||
-        !Copy(&view,camera+cache+pov+position,12)||!Finite(view)||!Copy(&viewRotation,camera+cache+pov+rotation,12) ||
-        !session.reflection.Value(camera,"WhatIfCamera","GPCamRotation","StructProperty",gameRotation))return L"Camera limits could not be read.";
-    int minimum=SignedRotation(down.pitch),maximum=SignedRotation(up.pitch);
-    if(session.reflection.BoolIsSet(behaviour,"CBA_3RD_Basic","bOverrideNextPitch")) {
-        if(!session.reflection.Value(behaviour,"CBA_3RD_Basic","NextPitchMin","IntProperty",minimum)||!session.reflection.Value(behaviour,"CBA_3RD_Basic","NextPitchMax","IntProperty",maximum))return L"Camera limits could not be read.";
-        minimum=SignedRotation(minimum);maximum=SignedRotation(maximum);
-    }
-    if(minimum>maximum||minimum< -16384||maximum>16384)return L"Unsupported camera limits.";
-    Vec3 delta=Sub(target->position,view);
-    if(Length(delta)<1)return L"The target is too close to aim at.";
-    const float units=65536/(2*Pi);
-    const int yaw=static_cast<int>(std::lround(std::atan2(delta.y,delta.x)*units));
-    const int pitch=static_cast<int>(std::lround(std::atan2(delta.z,std::hypot(delta.x,delta.y))*units));
-    Rotator wanted=gameRotation;
-    wanted.yaw=SignedRotation(SignedRotation(gameRotation.yaw)+SignedRotation(yaw-SignedRotation(viewRotation.yaw)));
-    if(NeedsInteractionFocus(target->kind))
-        wanted.pitch=std::clamp(SignedRotation(gameRotation.pitch)+SignedRotation(pitch-SignedRotation(viewRotation.pitch)),minimum,maximum);
-    if(!RequestCameraRotation(session,behaviour,wanted))return L"The camera request failed.";
+    if(!Submit(native)){attempt={};return L"The camera request failed.";}
     submitted=true;
     return L"Turning toward "+target->label+L".";
+}
+std::wstring TickFacing(const Snapshot& fresh,std::string& completed) {
+    completed.clear();
+    if(!OnThread())return {};
+    if(!cancelled.empty()){completed=cancelled;cancelled.clear();if(!attempt.policy.running)return {};}
+    if(!attempt.policy.running)return {};
+    if(!Ready()||!fresh.active||fresh.interactionBusy)return Finish(Result::Cancelled,completed);
+    // Focus may be off-centre: never turn again to satisfy an invented success cone.
+    if(attempt.pitch&&fresh.focusedId==attempt.id)return Finish(Result::Focused,completed);
+    const auto target=std::find_if(fresh.targets.begin(),fresh.targets.end(),[](const Target& t){return t.stableId==attempt.id;});
+    if(target==fresh.targets.end())return Finish(Result::Cancelled,completed);
+    facing_native::NativeFrame native;
+    if(!Observe(fresh,*target,native))return Finish(GameSession().faceFaulted?Result::Unavailable:Result::Cancelled,completed);
+    native.frame.context=attempt.identity.Same(native)&&attempt.pitch==NeedsInteractionFocus(target->kind);
+    const auto result=attempt.policy.Step(native.frame);
+    if(result==Result::Wait)return {};
+    if(result!=Result::Request)return Finish(result,completed);
+    if(!Submit(native))return Finish(Result::Unavailable,completed);
+    return {};
 }
 }

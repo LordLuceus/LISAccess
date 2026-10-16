@@ -27,7 +27,7 @@ int main() {
     s.focusedId.clear();target.angleRestricted=true;
     text=navigation::detail::Describe(s,target);
     if(text.find(L"Not focused. Face this target before choosing an action.")==std::wstring::npos ||
-        text.find(L"Try facing or approaching it from another direction.")==std::wstring::npos)return 5;
+        text.find(L"Try approaching it from another side.")==std::wstring::npos)return 5;
     target.kind=world::Kind::Destination;
     text=navigation::detail::Describe(s,target);
     if(text.find(L"focused")!=std::wstring::npos || text.find(L"approaching")!=std::wstring::npos)return 6;

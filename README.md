@@ -374,9 +374,15 @@ behaviour. The hallway exit to the main campus has passed its in-game playtest.
 Facing supports the normal basic camera and clamps requests to its authored
 pitch bounds. Fixed, dialogue, derived or multiple-active-behaviour camera modes
 are refused; other transitions still need testing.
+After a turn, facing checks the camera's actual position and can make brief
+corrections for up to two and a half seconds. Moving, manually changing the
+camera direction, selecting another target or opening a menu stops further
+corrections. It never moves Max or activates an interaction.
 Collision, camera offsets and native interaction priority can prevent focus.
 “Turning toward” acknowledges a request, not successful focus: listen for the
 actual object/action announcement, and move closer or aim manually if necessary.
+An approach-side restriction requires approaching from another side of the
+object; turning the camera alone does not remove it.
 The successful classroom test does not prove every action or camera mode.
 
 ### Beacons and obstacles

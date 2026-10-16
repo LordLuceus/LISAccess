@@ -1,5 +1,19 @@
 # LISAccess changelog
 
+## 2026-10-16 — Facing correction
+
+- Facing now checks the actual camera position after turning and can make brief
+  follow-up corrections, rather than leaving the target off-centre after a
+  single turn. It stops when the game focuses the selected object, when you move
+  or manually change the camera direction, or after a short time limit.
+- Other objects' action announcements wait while facing is still correcting.
+  Turning toward an object is still distinct from gaining interaction focus;
+  native range, approach-side and visibility restrictions remain in effect.
+- Targets restricted to a particular approach side now advise approaching from
+  another side, rather than suggesting camera rotation can remove that restriction.
+- Native camera limits still apply: facing does not guarantee focus from every
+  position or support additional camera modes.
+
 ## 2026-10-16 — Guided manual navigation
 
 - **Guided beacons (experimental):** the existing beacon control now finds a local
